@@ -33,11 +33,12 @@ const MIN_SCALE = 0.25
 const MAX_SCALE = 12
 /** 每格显示像素低于该值时隐藏网格线 */
 const MIN_GRID_LINE_PX = 10
-/** 视角旋转灵敏度（rad/px）与俯仰角可调范围（-30°~85°，初始 55°）。
- *  允许低于地平线：相机钻到板子下方可看到珠子底面/板子背面 */
+/** 视角旋转灵敏度（rad/px）与俯仰角可调范围（±89.5°，初始 55°）。
+ *  配合无限制的 yaw，可环绕棋盘无死角观赏：上到头顶、下到板底。
+ *  正负 90° 极点有万向锁（水平拖拽无效），各留 0.5° 余量即可 */
 const ROT_SPEED = 0.006
-const PITCH_MIN = (-30 * Math.PI) / 180
-const PITCH_MAX = (85 * Math.PI) / 180
+const PITCH_MIN = (-89.5 * Math.PI) / 180
+const PITCH_MAX = (89.5 * Math.PI) / 180
 /** 设计模式放豆的最低俯仰角：相机低于板面时射线够不到 y=0 地面，点不中格子、WASD 失效 */
 const DESIGN_PITCH_MIN = (3 * Math.PI) / 180
 
@@ -406,26 +407,25 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     if (e.button === 2) return
     positionIron(e.clientX, e.clientY)
     const p = groundFromClient(e.clientX, e.clientY)
-    if (!p) return
-    store.mouse.x = p.x * CELL
-    store.mouse.y = p.z * CELL
+    if (p) {
+      store.mouse.x = p.x * CELL
+      store.mouse.y = p.z * CELL
+    }
     store.mouse.down = true
     if (store.mode !== 'design' || e.button !== 0) return
     if (store.viewMode) {
-      // 视角工具：左键拖拽旋转相机；首次拖拽弹出操作提示
+      // 视角工具：左键拖拽旋转相机；首次拖拽弹出操作提示。
+      // 相机钻到板下（地平线下）时地面射线无交点，旋转拖拽不依赖它，照常可用
       rotDrag = { sx: e.clientX, sy: e.clientY, yaw0: yaw, pitch0: pitch }
       showViewHint()
-    } else {
-      placeBead(p.x * CELL, p.z * CELL)
+      return
     }
+    if (!p) return
+    placeBead(p.x * CELL, p.z * CELL)
   }
 
   function onPointerMove(e: PointerEvent) {
     positionIron(e.clientX, e.clientY)
-    const p = groundFromClient(e.clientX, e.clientY)
-    if (!p) return
-    store.mouse.x = p.x * CELL
-    store.mouse.y = p.z * CELL
     if (rotDrag) {
       // 视角拖拽（棋盘跟随鼠标的直觉方向）：水平右拖绕 Y 轴右转，向下拖视角变高更俯视
       yaw = rotDrag.yaw0 + (e.clientX - rotDrag.sx) * ROT_SPEED
@@ -437,6 +437,10 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
       ensureGridFitsViewport()
       return
     }
+    const p = groundFromClient(e.clientX, e.clientY)
+    if (!p) return
+    store.mouse.x = p.x * CELL
+    store.mouse.y = p.z * CELL
     // 设计模式按住拖拽连续放豆/擦除（placeBead 仅在内容实际变化时递增 gridVersion）
     if (store.mode === 'design' && !store.viewMode && store.mouse.down) placeBead(p.x * CELL, p.z * CELL)
   }
@@ -457,17 +461,23 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   function onWheel(e: WheelEvent) {
     e.preventDefault()
     const p = groundFromClient(e.clientX, e.clientY)
-    if (!p) return
-    // 锚点缩放：鼠标下的地面点保持投影位置不变
+    // 锚点缩放：鼠标下的地面点保持投影位置不变。相机在地平线下（地面射线无交点）时
+    // 退化为绕注视中心缩放，钻到板下也能拉近/拉远
     const oldDist = baseDist / scale
     const factor = e.deltaY < 0 ? 1.15 : 0.87
     scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale * factor))
     const r = (baseDist / scale) / oldDist
-    camera.position.x = p.x + (camera.position.x - p.x) * r
-    camera.position.y = p.y + (camera.position.y - p.y) * r
-    camera.position.z = p.z + (camera.position.z - p.z) * r
-    center.x = p.x + (center.x - p.x) * r
-    center.z = p.z + (center.z - p.z) * r
+    if (p) {
+      camera.position.x = p.x + (camera.position.x - p.x) * r
+      camera.position.y = p.y + (camera.position.y - p.y) * r
+      camera.position.z = p.z + (camera.position.z - p.z) * r
+      center.x = p.x + (center.x - p.x) * r
+      center.z = p.z + (center.z - p.z) * r
+    } else {
+      camera.position.x = controls.target.x + (camera.position.x - controls.target.x) * r
+      camera.position.y = controls.target.y + (camera.position.y - controls.target.y) * r
+      camera.position.z = controls.target.z + (camera.position.z - controls.target.z) * r
+    }
     controls.target.set(center.x, 0, center.z)
     updateGridLines()
     ensureGridFitsViewport()
