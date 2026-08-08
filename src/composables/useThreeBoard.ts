@@ -10,6 +10,7 @@ import {
   createEvaFilledMaterials,
   createEvaHollowMaterials,
   createFilledBeadGeometry,
+  createFusedBeadGeometry,
   createHollowBeadGeometry,
 } from './useBeadGeometry'
 import ironImgUrl from '../assets/iron.png'
@@ -130,11 +131,13 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   // 珠子几何体与 EVA 材质组（[0]=cap 顶/底面、[1]=外壁清漆、[2]=孔内壁哑光，配合 ExtrudeGeometry groups）
   let hollowGeo = createHollowBeadGeometry(store.beadSize)
   let filledGeo = createFilledBeadGeometry(store.beadSize)
+  let fusedGeo = createFusedBeadGeometry(store.beadSize)
   const hollowMats = createEvaHollowMaterials()
   const filledMats = createEvaFilledMaterials()
   let size: BeadSize = store.beadSize
   let hollowMesh: THREE.InstancedMesh | null = null
   let filledMesh: THREE.InstancedMesh | null = null
+  let fusedMesh: THREE.InstancedMesh | null = null
 
   // 图纸色块（导入图片的像素参考层，放豆后由珠子盖住）
   const patternGeo = new THREE.PlaneGeometry(0.98, 0.98)
@@ -317,7 +320,8 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     const sc = new THREE.Vector3()
     const q = new THREE.Quaternion()
     const m4 = new THREE.Matrix4()
-    if (mesh === filledMesh) {
+    if (mesh === filledMesh || mesh === fusedMesh) {
+      // 熔融/完全熔融：圆角矩形压扁形态，随机轴向略微拉伸模拟融合方向
       const bh2 = beadHash(r, c)
       const ax = 0.94 + bh2 * 0.12
       const az = 0.94 + (1 - bh2) * 0.12
@@ -332,22 +336,27 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     mesh.setColorAt(idx, col)
   }
 
-  /** 全量重建珠子实例（放豆/擦除/导入/载入/熔融跨形态边界时调用） */
+  /** 全量重建珠子实例（放豆/擦除/导入/载入/熔融跨形态边界时调用）。
+   *  三形态：未熔融空心珠（<0.35）→ 熔融扁珠带残留孔（0.35~FUSE_MAX）→ 完全熔融无孔（≥FUSE_MAX，熨烫到位） */
   function buildBeadInstances() {
     const hollow: { r: number; c: number; m: number }[] = []
     const filled: { r: number; c: number; m: number }[] = []
+    const fused: { r: number; c: number; m: number }[] = []
     for (let r = 0; r < store.rows; r++)
       for (let c = 0; c < store.cols; c++) {
         const cell = store.grid[r][c]
         if (!cell.color) continue
         if (cell.melt < 0.35) hollow.push({ r, c, m: cell.melt })
-        else filled.push({ r, c, m: cell.melt })
+        else if (cell.melt < FUSE_MAX) filled.push({ r, c, m: cell.melt })
+        else fused.push({ r, c, m: cell.melt })
       }
 
     if (hollowMesh) scene.remove(hollowMesh)
     if (filledMesh) scene.remove(filledMesh)
+    if (fusedMesh) scene.remove(fusedMesh)
     hollowMesh = null
     filledMesh = null
+    fusedMesh = null
     beadIndex.clear()
 
     if (hollow.length > 0) {
@@ -375,6 +384,19 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
       filledMesh.instanceMatrix.needsUpdate = true
       if (filledMesh.instanceColor) filledMesh.instanceColor.needsUpdate = true
       scene.add(filledMesh)
+    }
+    if (fused.length > 0) {
+      fusedMesh = new THREE.InstancedMesh(fusedGeo, filledMats, Math.max(fused.length, 1))
+      fusedMesh.castShadow = true
+      for (let i = 0; i < fused.length; i++) {
+        const { r, c, m } = fused[i]
+        writeInstance(fusedMesh, i, r, c, m)
+        beadIndex.set(r * MAX_GRID + c, { mesh: fusedMesh, idx: i })
+      }
+      fusedMesh.count = fused.length
+      fusedMesh.instanceMatrix.needsUpdate = true
+      if (fusedMesh.instanceColor) fusedMesh.instanceColor.needsUpdate = true
+      scene.add(fusedMesh)
     }
   }
 
@@ -561,14 +583,16 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     const c1 = Math.min(store.cols - 1, Math.ceil(mx + rad))
     const r0 = Math.max(0, Math.floor(mz - rad))
     const r1 = Math.min(store.rows - 1, Math.ceil(mz + rad))
-    // 有珠子跨过熔融形态边界（hollow ↔ filled）→ 全量重建
+    // 有珠子跨过熔融形态边界（hollow ↔ filled ↔ fused）→ 全量重建
+    const formOf = (m: number) => (m >= FUSE_MAX ? 2 : m >= 0.35 ? 1 : 0)
     for (let r = r0; r <= r1; r++)
       for (let c = c0; c <= c1; c++) {
         const cell = store.grid[r][c]
         if (!cell.color) continue
         const entry = beadIndex.get(r * MAX_GRID + c)
         if (!entry) continue
-        if ((cell.melt >= 0.35) !== (entry.mesh === filledMesh)) {
+        const entryForm = entry.mesh === fusedMesh ? 2 : entry.mesh === filledMesh ? 1 : 0
+        if (formOf(cell.melt) !== entryForm) {
           buildBeadInstances()
           return
         }
@@ -593,6 +617,10 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
         filledMesh.instanceMatrix.needsUpdate = true
         if (filledMesh.instanceColor) filledMesh.instanceColor.needsUpdate = true
       }
+      if (fusedMesh) {
+        fusedMesh.instanceMatrix.needsUpdate = true
+        if (fusedMesh.instanceColor) fusedMesh.instanceColor.needsUpdate = true
+      }
     }
   }
 
@@ -607,8 +635,10 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     size = next
     hollowGeo.dispose()
     filledGeo.dispose()
+    fusedGeo.dispose()
     hollowGeo = createHollowBeadGeometry(size)
     filledGeo = createFilledBeadGeometry(size)
+    fusedGeo = createFusedBeadGeometry(size)
     rebuild()
   }
 
@@ -622,6 +652,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     clearTimeout(hintTimer)
     hollowGeo.dispose()
     filledGeo.dispose()
+    fusedGeo.dispose()
     lineGeo.dispose()
     patternGeo.dispose()
     for (const m of hollowMats) m.dispose()

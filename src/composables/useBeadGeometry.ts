@@ -108,6 +108,34 @@ export function createFilledBeadGeometry(_size: BeadSize = 'big'): THREE.Extrude
 }
 
 /**
+ * 完全熔融扁珠几何体：圆角矩形拉伸，无孔——熨烫到位（FUSE_MAX）后孔洞完全闭合，
+ * 表面不再有凹点。轮廓与 filled 相同，仅去掉残留孔（侧壁单一材质，无需拆组）。
+ */
+export function createFusedBeadGeometry(_size: BeadSize = 'big'): THREE.ExtrudeGeometry {
+  const rw = 0.95
+  const rh = 0.95
+  const rr = 0.25
+  const rrect = new THREE.Shape()
+  rrect.moveTo(-rw + rr, -rh)
+  rrect.lineTo(rw - rr, -rh)
+  rrect.quadraticCurveTo(rw, -rh, rw, -rh + rr)
+  rrect.lineTo(rw, rh - rr)
+  rrect.quadraticCurveTo(rw, rh, rw - rr, rh)
+  rrect.lineTo(-rw + rr, rh)
+  rrect.quadraticCurveTo(-rw, rh, -rw, rh - rr)
+  rrect.lineTo(-rw, -rh + rr)
+  rrect.quadraticCurveTo(-rw, -rh, -rw + rr, -rh)
+  const geo = new THREE.ExtrudeGeometry(rrect, {
+    depth: 1,
+    bevelEnabled: false,
+    curveSegments: 32,
+  })
+  geo.center()
+  geo.rotateX(Math.PI / 2)
+  return geo
+}
+
+/**
  * EVA 表面粗糙度噪声贴图（程序化 value noise，乘法工作流）：
  * base roughness 恒为 1，贴图 green 通道直接承载最终粗糙度——
  * 模拟注塑细微纹理，避免纯色材质在环境高光下显得"死板"。
