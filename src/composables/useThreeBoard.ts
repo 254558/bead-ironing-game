@@ -33,10 +33,13 @@ const MIN_SCALE = 0.25
 const MAX_SCALE = 12
 /** 每格显示像素低于该值时隐藏网格线 */
 const MIN_GRID_LINE_PX = 10
-/** 视角旋转灵敏度（rad/px）与俯仰角可调范围（10°~85°，初始 55°） */
+/** 视角旋转灵敏度（rad/px）与俯仰角可调范围（-30°~85°，初始 55°）。
+ *  允许低于地平线：相机钻到板子下方可看到珠子底面/板子背面 */
 const ROT_SPEED = 0.006
-const PITCH_MIN = (10 * Math.PI) / 180
+const PITCH_MIN = (-30 * Math.PI) / 180
 const PITCH_MAX = (85 * Math.PI) / 180
+/** 设计模式放豆的最低俯仰角：相机低于板面时射线够不到 y=0 地面，点不中格子、WASD 失效 */
+const DESIGN_PITCH_MIN = (3 * Math.PI) / 180
 
 /**
  * 拼豆棋盘渲染器：three.js 实时光照（EVA 哑光塑料材质），
@@ -506,6 +509,11 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   let raf = 0
   function animate() {
     raf = requestAnimationFrame(animate)
+    // 设计模式兜底：若视角仍低于 DESIGN_PITCH_MIN（从背面视角直接切回放豆），抬回安全俯仰角
+    if (!store.viewMode && pitch < DESIGN_PITCH_MIN) {
+      pitch = DESIGN_PITCH_MIN
+      applyView()
+    }
     updateIronOverlay()
     updateHover()
     updateGridLines() // 完成模式开关即时隐藏/恢复网格线
