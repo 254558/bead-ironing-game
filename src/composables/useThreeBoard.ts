@@ -52,6 +52,10 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   // 背景深色：棋盘地面/背景一体（侧栏透明悬浮其上）。不用纯透明——
   // 有些浏览器的默认页面底色为白，透明处会露出白块
   scene.background = new THREE.Color(0x171a21)
+  // 与背景同色的雾（仅设计模式工作台启用）：地面在远处（70~550 单位）平滑渐隐为背景色，
+  // 消除低视角时地面与背景的硬交界（地平线）；棋盘在 50 单位内不受影响
+  const fog = new THREE.Fog(0x171a21, 70, 550)
+  scene.fog = fog
 
   const camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 600)
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
@@ -269,9 +273,14 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     expandGridKeep(Math.ceil(maxX) + 2, Math.ceil(maxZ) + 2)
   }
 
-  /** 网格线显隐：完成（展示）模式隐藏，设计模式按缩放后每格的显示密度决定 */
-  function updateGridLines() {
-    gridLines.visible = !store.viewMode && DISPLAY_CELL * scale >= MIN_GRID_LINE_PX
+  /** 场景可见性：视角模式隐藏全部平面（地面/网格线/图纸），只看拼豆悬浮，转正面↔背面无任何面挡在中间；
+   *  设计模式显示工作台供放豆，网格线再按缩放后每格的显示密度决定 */
+  function updateSceneVisibility() {
+    const showBoard = !store.viewMode
+    gridLines.visible = showBoard && DISPLAY_CELL * scale >= MIN_GRID_LINE_PX
+    ground.visible = showBoard
+    if (patternMesh) patternMesh.visible = showBoard
+    scene.fog = showBoard ? fog : null
   }
 
   /** 相机按当前 center/scale/yaw/pitch 定位（yaw=π、pitch=55° 时与初始固定视角一致） */
@@ -291,7 +300,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     // 补光从斜对面照向注视中心，填充暗面
     fill.position.set(center.x - 70, 70, center.z - 50)
     fill.target.position.set(center.x, 0, center.z)
-    updateGridLines()
+    updateSceneVisibility()
   }
 
   /** 写入单个珠子 instance 的矩阵/颜色（熔融形态公式，按豆子规格缩放）。
@@ -479,7 +488,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
       camera.position.z = controls.target.z + (camera.position.z - controls.target.z) * r
     }
     controls.target.set(center.x, 0, center.z)
-    updateGridLines()
+    updateSceneVisibility()
     ensureGridFitsViewport()
   }
 
@@ -526,7 +535,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     }
     updateIronOverlay()
     updateHover()
-    updateGridLines() // 完成模式开关即时隐藏/恢复网格线
+    updateSceneVisibility() // 模式开关即时隐藏/恢复地面、网格线、图纸与雾
     controls.update()
     renderer.render(scene, camera)
   }
