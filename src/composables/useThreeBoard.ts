@@ -170,20 +170,27 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     }, 2600)
   }
 
-  /** WASD 平移视角：W/S 沿视线方向前后、A/D 沿屏幕左右（跟随当前 yaw），步长≈屏幕 12px */
+  /** WASD/方向键平移视角：W/↑ 沿视线方向前后、A/D 与 ←/→ 沿屏幕左右（跟随当前 yaw），步长≈屏幕 12px */
   function onKeyDown(e: KeyboardEvent) {
     const t = e.target as HTMLElement | null
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
     if (e.ctrlKey || e.metaKey || e.altKey) return
     if (store.mode !== 'design' || store.showSavePanel) return
-    const fwd = e.code === 'KeyW' ? 1 : e.code === 'KeyS' ? -1 : 0
-    const strafe = e.code === 'KeyD' ? 1 : e.code === 'KeyA' ? -1 : 0
+    const fwd =
+      e.code === 'KeyW' || e.code === 'ArrowUp' ? 1 : e.code === 'KeyS' || e.code === 'ArrowDown' ? -1 : 0
+    const strafe =
+      e.code === 'KeyD' || e.code === 'ArrowRight'
+        ? 1
+        : e.code === 'KeyA' || e.code === 'ArrowLeft'
+          ? -1
+          : 0
     if (fwd === 0 && strafe === 0) return
     e.preventDefault()
     const { w } = viewportSize()
     const pr = groundPoint(1, 0)!
     const pl = groundPoint(-1, 0)!
-    const step = Math.max(1e-6, (pr.x - pl.x) / w) * 12
+    // 屏幕左右缘的地面距离 ÷ 屏宽 = 每像素地面步长；注意相机朝向不同时该差值为负，取绝对值
+    const step = Math.max(1e-6, Math.abs(pr.x - pl.x) / w) * 12
     center.x += (fwd * -Math.sin(yaw) + strafe * Math.cos(yaw)) * step
     center.z += (fwd * -Math.cos(yaw) + strafe * -Math.sin(yaw)) * step
     applyView()
