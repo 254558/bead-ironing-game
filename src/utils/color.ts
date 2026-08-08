@@ -7,6 +7,8 @@ export const BEAD_R = 6
 export const IRON_RADIUS = 55
 export const FUSE_MIN = 0.3
 export const FUSE_MAX = 0.7
+/** 孔洞完全闭合的熔融下限：烫到此处起珠子无孔，保持到烫糊前（「刚好」容错区间） */
+export const FUSE_SEALED = 0.5
 export const BURN = 0.85
 export const IRON_SPEED = 1.0
 export const MAX_PIX = 60

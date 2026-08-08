@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { eraseCell, expandGridKeep, getCellAt, MAX_GRID, placeBead, store } from '../stores/game'
 import type { BeadSize } from '../types'
-import { CELL, DISPLAY_CELL, FUSE_MAX, IRON_RADIUS, beadHash, burnAt } from '../utils/color'
+import { CELL, DISPLAY_CELL, FUSE_MAX, FUSE_SEALED, IRON_RADIUS, beadHash, burnAt } from '../utils/color'
 import {
   BEAD_HEIGHT,
   BEAD_SCALE,
@@ -337,7 +337,8 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   }
 
   /** 全量重建珠子实例（放豆/擦除/导入/载入/熔融跨形态边界时调用）。
-   *  三形态：未熔融空心珠（<0.35）→ 熔融扁珠带残留孔（0.35~FUSE_MAX）→ 完全熔融无孔（≥FUSE_MAX，熨烫到位） */
+   *  三形态：未熔融空心珠（<0.35）→ 熔融扁珠带残留孔（0.35~FUSE_SEALED）→ 完全熔融无孔（≥FUSE_SEALED，
+   *  烫到「刚好」容错区间即无孔，直到烫糊前都保持闭合） */
   function buildBeadInstances() {
     const hollow: { r: number; c: number; m: number }[] = []
     const filled: { r: number; c: number; m: number }[] = []
@@ -347,7 +348,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
         const cell = store.grid[r][c]
         if (!cell.color) continue
         if (cell.melt < 0.35) hollow.push({ r, c, m: cell.melt })
-        else if (cell.melt < FUSE_MAX) filled.push({ r, c, m: cell.melt })
+        else if (cell.melt < FUSE_SEALED) filled.push({ r, c, m: cell.melt })
         else fused.push({ r, c, m: cell.melt })
       }
 
@@ -584,7 +585,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     const r0 = Math.max(0, Math.floor(mz - rad))
     const r1 = Math.min(store.rows - 1, Math.ceil(mz + rad))
     // 有珠子跨过熔融形态边界（hollow ↔ filled ↔ fused）→ 全量重建
-    const formOf = (m: number) => (m >= FUSE_MAX ? 2 : m >= 0.35 ? 1 : 0)
+    const formOf = (m: number) => (m >= FUSE_SEALED ? 2 : m >= 0.35 ? 1 : 0)
     for (let r = r0; r <= r1; r++)
       for (let c = c0; c <= c1; c++) {
         const cell = store.grid[r][c]
