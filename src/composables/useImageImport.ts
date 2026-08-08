@@ -1,13 +1,15 @@
 import { expandGrid, showStatus, store, switchMode } from '../stores/game'
 import { COLORS, COLORS_RGB, MAX_PIX } from '../utils/color'
+import type { ImportMode } from '../types'
 
 /**
  * 图片导入 → 拼豆图纸：离屏画布缩采样 → 加权 RGB 最近色量化到调色板（豆子颜色）→
- * 写入 pixel 层，每个格子显示对应的豆子颜色方块，不自动摆豆。
- * 对照图纸手动放豆；放下的珠子覆盖图纸格，擦除即露出图纸。
+ * 写入 pixel 层，每个格子显示对应的豆子颜色方块。
+ * - pattern：只做图纸，对照手动放豆；放下的珠子覆盖图纸格，擦除即露出图纸。
+ * - beads：同时写入 color 自动铺好豆子，导入完直接进熨烫模式，只需烫平。
  * 尺寸超出当前画布时自动扩容。
  */
-export function importImage(file: File) {
+export function importImage(file: File, mode: ImportMode) {
   showStatus('正在读取图片...')
   const url = URL.createObjectURL(file)
   const img = new Image()
@@ -65,12 +67,18 @@ export function importImage(file: File) {
           }
         }
         store.grid[gr][gc].pixel = COLORS[best]
+        // 直接变豆子：自动铺好色块，导入完只需熨烫
+        if (mode === 'beads') store.grid[gr][gc].color = COLORS[best]
       }
     }
 
-    switchMode('design')
+    switchMode(mode === 'beads' ? 'ironing' : 'design')
     store.gridVersion++ // 图纸写入完成，通知画布静态层缓存失效
-    showStatus('导入完成：拼豆图纸，可对照放豆')
+    showStatus(
+      mode === 'beads'
+        ? '豆子已自动铺好，按住拖动熨烫'
+        : '导入完成：拼豆图纸，可对照放豆',
+    )
     URL.revokeObjectURL(url)
   }
 

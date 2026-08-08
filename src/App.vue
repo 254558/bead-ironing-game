@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ColorWheelPanel from './components/ColorWheelPanel.vue'
+import ImportDialog from './components/ImportDialog.vue'
 import Stage from './components/Stage.vue'
 import ToolPanel from './components/ToolPanel.vue'
 </script>
@@ -13,5 +14,6 @@ import ToolPanel from './components/ToolPanel.vue'
     <aside class="sidebar sidebar-right">
       <ColorWheelPanel />
     </aside>
+    <ImportDialog />
   </div>
 </template>

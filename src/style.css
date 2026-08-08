@@ -104,6 +104,76 @@ body {
   display: none;
 }
 
+/* ---------- 导入方式对话框 ---------- */
+.import-dialog-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 10, 14, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+}
+.import-dialog {
+  width: 340px;
+  background: #1d2129;
+  border: 1px solid #2e3540;
+  border-radius: 14px;
+  padding: 22px 24px 18px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  color: #e2e6ec;
+  text-align: center;
+}
+.import-dialog h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.import-dialog-desc {
+  margin: 0 0 16px;
+  font-size: 12px;
+  color: #8b94a3;
+}
+.import-dialog-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  border: 1px solid #2e3540;
+  border-radius: 10px;
+  background: #262b35;
+  color: #e2e6ec;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.import-dialog-btn:hover {
+  border-color: #ef7d57;
+  background: #2c323d;
+}
+.import-dialog-btn-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+.import-dialog-btn-sub {
+  font-size: 11px;
+  color: #8b94a3;
+}
+.import-dialog-cancel {
+  margin-top: 4px;
+  padding: 8px 0;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: #7c8594;
+  font-size: 12px;
+  cursor: pointer;
+}
+.import-dialog-cancel:hover {
+  color: #cdd2da;
+}
+
 /* ---------- 舞台 ---------- */
 /* 3D 棋盘铺满整个窗口（侧栏透明，悬浮于棋盘之上）。
    z-index 保持 auto：不建立层叠上下文，SavePanel(z-8)/IronProgress(z-50) 等覆盖层

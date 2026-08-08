@@ -1,5 +1,5 @@
 import { computed, reactive } from 'vue'
-import type { BeadSize, Cell, IronCenter, IronProgress, Mode, MouseState, SavedBoard } from '../types'
+import type { BeadSize, Cell, ImportMode, IronCenter, IronProgress, Mode, MouseState, SavedBoard } from '../types'
 import { CELL, COLORS } from '../utils/color'
 import { renderThumb } from '../utils/thumbnail'
 
@@ -98,6 +98,10 @@ export const store = reactive({
   mode: 'design' as Mode,
   /** 豆子规格：大豆 5mm（新手/手摆）／迷你豆 2.6mm（像素精细、更易烫糊） */
   beadSize: 'big' as BeadSize,
+  /** 导入图片的两种方式：图纸（像素参考层，自己放豆）／直接变豆子（自动铺好，只需熨烫） */
+  importMode: 'pattern' as ImportMode,
+  /** 导入方式选择对话框开关（点「导入」后先问怎么导） */
+  showImportDialog: false,
   mouse: { x: -1, y: -1, down: false } as MouseState,
   /** 熨烫中心：游标小人的脚踩到的地面点（脚的位置 = 鼠标 + 图标脚偏移），脚踩到哪就烫到哪 */
   iron: { x: -1, y: -1 } as IronCenter,

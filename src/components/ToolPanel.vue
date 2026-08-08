@@ -1,10 +1,7 @@
 <script setup lang="ts">
-import { computed, useTemplateRef } from 'vue'
+import { computed } from 'vue'
 import LineSidebar from './bits/LineSidebar.vue'
-import { importImage } from '../composables/useImageImport'
 import { clearAll, hasBeads, saveBoard, setSavePanel, showStatus, store, switchMode } from '../stores/game'
-
-const fileInput = useTemplateRef<HTMLInputElement>('fileInput')
 
 /** 左侧工具菜单（vue-bits LineSidebar）：设计 / 熨烫 / 视角 / 导入 / 保存 / 恢复 / 清空 */
 const items = ['设计', '熨烫', '视角', '导入', '保存', '恢复', '清空']
@@ -35,7 +32,8 @@ function onItemClick(index: number) {
       toggleView(!store.viewMode)
       break
     case 3:
-      fileInput.value?.click()
+      // 先问导入方式（图纸 / 直接变豆子），选完再挑文件
+      store.showImportDialog = true
       break
     case 4:
       if (hasBeads) saveBoard()
@@ -48,13 +46,6 @@ function onItemClick(index: number) {
       clearAll()
       break
   }
-}
-
-function onFileChange(e: Event) {
-  const input = e.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (file) importImage(file)
-  input.value = ''
 }
 </script>
 
@@ -78,6 +69,5 @@ function onFileChange(e: Event) {
         @item-click="onItemClick"
       />
     </div>
-    <input ref="fileInput" type="file" accept="image/*" class="file-input" @change="onFileChange">
   </div>
 </template>
