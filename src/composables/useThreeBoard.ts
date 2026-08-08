@@ -170,7 +170,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     }, 2600)
   }
 
-  /** WASD/方向键平移视角：W/↑ 沿视线方向前后、A/D 与 ←/→ 沿屏幕左右（跟随当前 yaw），步长≈屏幕 12px */
+  /** WASD/方向键平移视角：W/↑ 沿视线方向前后、A/D 与 ←/→ 沿屏幕左右（跟随当前 yaw），步长≈一格（默认缩放下 36px） */
   function onKeyDown(e: KeyboardEvent) {
     const t = e.target as HTMLElement | null
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
@@ -189,8 +189,9 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     const { w } = viewportSize()
     const pr = groundPoint(1, 0)!
     const pl = groundPoint(-1, 0)!
-    // 屏幕左右缘的地面距离 ÷ 屏宽 = 每像素地面步长；注意相机朝向不同时该差值为负，取绝对值
-    const step = Math.max(1e-6, Math.abs(pr.x - pl.x) / w) * 12
+    // 屏幕左右缘的地面距离 ÷ 屏宽 = 每像素地面步长；注意相机朝向不同时该差值为负，取绝对值。
+    // 每按移动 36px（默认缩放下恰好一格），按住时系统自动连发
+    const step = Math.max(1e-6, Math.abs(pr.x - pl.x) / w) * 36
     center.x += (fwd * -Math.sin(yaw) + strafe * Math.cos(yaw)) * step
     center.z += (fwd * -Math.cos(yaw) + strafe * -Math.sin(yaw)) * step
     applyView()
