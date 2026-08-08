@@ -183,11 +183,10 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     if (store.mode !== 'design' || store.showSavePanel) return
     const fwd =
       e.code === 'KeyW' || e.code === 'ArrowUp' ? 1 : e.code === 'KeyS' || e.code === 'ArrowDown' ? -1 : 0
-    // A/← = 画面向左移、D/→ = 画面向右移（初始视角 yaw=π 下 cos 为负，符号与直觉相反，故反号）
     const strafe =
-      e.code === 'KeyA' || e.code === 'ArrowLeft'
+      e.code === 'KeyD' || e.code === 'ArrowRight'
         ? 1
-        : e.code === 'KeyD' || e.code === 'ArrowRight'
+        : e.code === 'KeyA' || e.code === 'ArrowLeft'
           ? -1
           : 0
     if (fwd === 0 && strafe === 0) return
