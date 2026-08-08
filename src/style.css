@@ -89,17 +89,6 @@ body {
   min-height: 0;
 }
 
-/* 轮盘锚定轴上的细轨道线，让色轮有依托感 */
-.wheel-holder::before {
-  content: '';
-  position: absolute;
-  left: calc(100% - 112px);
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: linear-gradient(to bottom, transparent, #e8e4d9 8%, #e8e4d9 92%, transparent);
-}
-
 .file-input {
   display: none;
 }
