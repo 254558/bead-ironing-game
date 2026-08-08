@@ -6,8 +6,8 @@ import { clearAll, hasBeads, saveBoard, setSavePanel, showStatus, store, switchM
 
 const fileInput = useTemplateRef<HTMLInputElement>('fileInput')
 
-/** 左侧工具菜单（vue-bits LineSidebar）：设计 / 熨烫 / 视角 / 导入图片 / 保存 / 恢复 / 清空 */
-const items = ['设计', '熨烫', '视角', '导入图片', '保存', '恢复', '清空']
+/** 左侧工具菜单（vue-bits LineSidebar）：设计 / 熨烫 / 视角 / 导入 / 保存 / 恢复 / 清空 */
+const items = ['设计', '熨烫', '视角', '导入', '保存', '恢复', '清空']
 
 /** 高亮项随模式/视角工具状态联动（外部受控） */
 const active = computed(() => (store.viewMode ? 2 : store.mode === 'ironing' ? 1 : 0))
@@ -64,6 +64,7 @@ function onFileChange(e: Event) {
       <LineSidebar
         :items="items"
         :active="active"
+        :show-index="false"
         accent-color="#ef7d57"
         text-color="#3a3d42"
         marker-color="#6c6c6c"
