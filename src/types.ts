@@ -19,6 +19,12 @@ export interface MouseState {
   down: boolean
 }
 
+/** 熨烫中心（地面世界坐标 × CELL，与 MouseState 同单位）：由游标图脚的位置换算，脚踩到哪就烫到哪 */
+export interface IronCenter {
+  x: number
+  y: number
+}
+
 export interface IronProgress {
   avg: number
   fused: number

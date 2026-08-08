@@ -255,11 +255,18 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     return groundPoint(nx, ny)
   }
 
-  /** 熨斗图片跟随鼠标（相对画布的坐标） */
+  /** 熨斗游标（clawd-dizzy.svg）：小人的脚相对游标中心（鼠标）的屏幕偏移——由 viewBox(-5,-4,22,20) 与
+   *  img 240×218 推得：脚 x 中心 7.5/22≈0.568 → +16px，脚 y15/20=0.95 → +98px */
+  const IRON_FOOT_OFFSET = { x: 16, y: 98 }
+
+  /** 熨斗图片跟随鼠标（相对画布的坐标）；同时把熨烫中心设为小人的脚踩到的地面点（脚踩到哪就烫到哪） */
   function positionIron(cx: number, cy: number) {
     const rect = renderer.domElement.getBoundingClientRect()
     ironImg.style.left = `${cx - rect.left}px`
     ironImg.style.top = `${cy - rect.top}px`
+    const p = groundFromClient(cx + IRON_FOOT_OFFSET.x, cy + IRON_FOOT_OFFSET.y)
+    store.iron.x = p ? p.x * CELL : -1
+    store.iron.y = p ? p.z * CELL : -1
   }
 
   /** 按当前相机可见范围扩容网格（只增不减、保留内容），保证视口内有格子 */
@@ -487,6 +494,8 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     store.mouse.x = -1
     store.mouse.y = -1
     store.mouse.down = false
+    store.iron.x = -1
+    store.iron.y = -1
     hoverBox.visible = false
   }
 
@@ -577,8 +586,9 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
 
   function update() {
     if (store.mode !== 'ironing' || store.mouse.x < 0) return
-    const mx = store.mouse.x / CELL
-    const mz = store.mouse.y / CELL
+    // 渲染更新区域与熔融判定一致：以小人的脚（熨烫中心）为圆心
+    const mx = store.iron.x / CELL
+    const mz = store.iron.y / CELL
     const rad = (IRON_RADIUS * 1.5) / CELL
     const c0 = Math.max(0, Math.floor(mx - rad))
     const c1 = Math.min(store.cols - 1, Math.ceil(mx + rad))

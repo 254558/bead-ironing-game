@@ -1,5 +1,5 @@
 import { computed, reactive } from 'vue'
-import type { BeadSize, Cell, IronProgress, Mode, MouseState, SavedBoard } from '../types'
+import type { BeadSize, Cell, IronCenter, IronProgress, Mode, MouseState, SavedBoard } from '../types'
 import { CELL, COLORS } from '../utils/color'
 import { renderThumb } from '../utils/thumbnail'
 
@@ -99,6 +99,8 @@ export const store = reactive({
   /** 豆子规格：大豆 5mm（新手/手摆）／迷你豆 2.6mm（像素精细、更易烫糊） */
   beadSize: 'big' as BeadSize,
   mouse: { x: -1, y: -1, down: false } as MouseState,
+  /** 熨烫中心：游标小人的脚踩到的地面点（脚的位置 = 鼠标 + 图标脚偏移），脚踩到哪就烫到哪 */
+  iron: { x: -1, y: -1 } as IronCenter,
   /** 默认选中色取亮色区（#a7f070 两侧是黄/绿）：轮盘选中项的前后邻居会竖着排成一条列，
    *  若默认选深色（藏青+深紫+暗红）会像一条黑色竖线；选亮绿可让所有深色至少距选中项 3 格 */
   selectedColor: COLORS[5],

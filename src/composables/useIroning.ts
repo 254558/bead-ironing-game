@@ -53,7 +53,7 @@ export function useIroning(render: () => void) {
     const dt = Math.min((ts - last) / 1000, 0.05)
     last = ts
 
-    if (store.mouse.down && store.mouse.x >= 0) {
+    if (store.mouse.down && store.mouse.x >= 0 && store.iron.x >= 0) {
       // 迷你豆壁薄升温快：熔化速度 ×1.2，更容易烫糊
       const speed = IRON_SPEED * (store.beadSize === 'mini' ? 1.2 : 1)
       for (let r = 0; r < store.rows; r++) {
@@ -62,8 +62,9 @@ export function useIroning(render: () => void) {
           if (!cell.color) continue
           const cx = c * CELL + CELL / 2
           const cy = r * CELL + CELL / 2
-          const ex = (cx - store.mouse.x) / (IRON_RADIUS * 1.25)
-          const ey = (cy - store.mouse.y) / (IRON_RADIUS * 1.15)
+          // 以小人的脚（熨烫中心）为圆心：脚踩到哪就烫到哪
+          const ex = (cx - store.iron.x) / (IRON_RADIUS * 1.25)
+          const ey = (cy - store.iron.y) / (IRON_RADIUS * 1.15)
           const d2 = ex * ex + ey * ey
           if (d2 < 1) {
             const f = 1 - Math.sqrt(d2)
