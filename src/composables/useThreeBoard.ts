@@ -45,9 +45,9 @@ const PITCH_MAX = (85 * Math.PI) / 180
  */
 export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   const scene = new THREE.Scene()
-  // 背景白色：棋盘地面/背景一体（侧栏透明悬浮其上）。不用纯透明——
-  // 有些浏览器的默认页面底色为黑，透明处会露出黑块
-  scene.background = new THREE.Color(0xffffff)
+  // 背景深色：棋盘地面/背景一体（侧栏透明悬浮其上）。不用纯透明——
+  // 有些浏览器的默认页面底色为白，透明处会露出白块
+  scene.background = new THREE.Color(0x171a21)
 
   const camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 600)
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
@@ -92,10 +92,10 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   fill.target = new THREE.Object3D()
   scene.add(fill.target) // 补光方向固定跟随注视中心，平移画布时光照一致
 
-  // 工作台地面（白色，接收珠子的投影）；范围足够大，任何缩放下都盖住视口
+  // 工作台地面（深色，比背景略亮以区分平面，接收珠子的投影）；范围足够大，任何缩放下都盖住视口
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(3000, 3000),
-    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, metalness: 0 }),
+    new THREE.MeshStandardMaterial({ color: 0x21252d, roughness: 0.95, metalness: 0 }),
   )
   ground.rotation.x = -Math.PI / 2
   ground.position.y = -0.02
@@ -110,7 +110,12 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   }
   const lineGeo = new THREE.BufferGeometry()
   lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(linePts, 3))
-  const gridLines = new THREE.LineSegments(lineGeo, new THREE.LineBasicMaterial({ color: 0xe7e4dc }))
+  // 网格线：深色地上用比地面亮的灰蓝。toneMapped:false 让线色按原值渲染——
+  // 否则 Neutral 色调映射会把暗色压得更暗，网格线反而比地面暗、看不见
+  const gridLines = new THREE.LineSegments(
+    lineGeo,
+    new THREE.LineBasicMaterial({ color: 0x505c74, toneMapped: false }),
+  )
   gridLines.position.y = 0.005
   scene.add(gridLines)
 

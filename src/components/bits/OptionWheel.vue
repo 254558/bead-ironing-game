@@ -366,10 +366,10 @@ onUnmounted(() => {
   width: var(--ow-swatch-size);
   height: var(--ow-swatch-size);
   border-radius: 9999px;
-  border: 2px solid rgba(0, 0, 0, 0.18);
+  border: 2px solid rgba(255, 255, 255, 0.28);
   box-shadow:
-    inset 0 1px 2px rgba(255, 255, 255, 0.4),
-    0 2px 6px rgba(60, 55, 45, 0.22);
+    inset 0 1px 2px rgba(255, 255, 255, 0.25),
+    0 2px 8px rgba(0, 0, 0, 0.5);
   outline: 2px solid transparent;
   outline-offset: 3px;
   transform: scale(calc(1 + var(--ow-p, 0) * 0.15));
@@ -377,13 +377,11 @@ onUnmounted(() => {
   outline-color: color-mix(in srgb, var(--ow-active-color, #ef7d57) calc(var(--ow-p, 0) * 100%), transparent);
 }
 
-/* 橡皮项：浅米底 + 深色 ✕（虚线边），与深色色块区分。
-   不用深底——轮盘上选中项两侧的色块会竖着排成一条列，
-   深色橡皮叠上深色色块会形成一条“黑色竖线” */
+/* 橡皮项：中性深灰底 + 浅色 ✕（虚线边），与深色背景下的彩色色块区分开 */
 .ow-swatch-eraser {
-  background-color: #f3efe6;
-  border: 2px dashed rgba(90, 85, 72, 0.45);
-  color: #3a3d42;
+  background-color: #3a4049;
+  border: 2px dashed rgba(255, 255, 255, 0.32);
+  color: #e8eaee;
   font-size: calc(var(--ow-swatch-size) * 0.5);
   font-weight: 600;
   line-height: 1;

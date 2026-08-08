@@ -38,7 +38,7 @@ function onWheelChange(index: number) {
         :min-opacity="0.08"
         :smoothing="180"
         :inset="92"
-        text-color="#9a9282"
+        text-color="#77808e"
         active-color="#ef7d57"
         @change="onWheelChange"
       />
