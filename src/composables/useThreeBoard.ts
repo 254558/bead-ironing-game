@@ -13,7 +13,7 @@ import {
   createFusedBeadGeometry,
   createHollowBeadGeometry,
 } from './useBeadGeometry'
-import ironImgUrl from '../assets/iron.png'
+import clawdDizzyUrl from '../assets/clawd-dizzy.svg'
 
 export interface ThreeBoardHandle {
   resize(): void
@@ -152,12 +152,12 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   )
   hoverBox.visible = false
   scene.add(hoverBox)
-  // 熨斗光标：透明背景 PNG 直接叠加在画布上方（不做 3D 投影），原图正常显示并跟随鼠标
+  // 熨斗光标：SVG 动画（眩晕小角色原地摇摆 + 星星绕头转）直接叠加在画布上方（不做 3D 投影），跟随鼠标
   const ironImg = document.createElement('img')
-  ironImg.src = ironImgUrl
+  ironImg.src = clawdDizzyUrl
   ironImg.alt = ''
   ironImg.style.cssText =
-    'position:absolute;left:0;top:0;width:150px;height:auto;pointer-events:none;' +
+    'position:absolute;left:0;top:0;width:240px;height:auto;pointer-events:none;' +
     'transform:translate(-50%,-50%);display:none;z-index:2;'
   container.appendChild(ironImg)
 
