@@ -1,4 +1,4 @@
-import { expandGrid, showStatus, store, switchMode } from '../stores/game'
+import { expandGrid, markDirty, showStatus, store, switchMode } from '../stores/game'
 import { COLORS, COLORS_RGB, MAX_PIX } from '../utils/color'
 import type { ImportMode } from '../types'
 
@@ -74,6 +74,7 @@ export function importImage(file: File, mode: ImportMode) {
 
     switchMode(mode === 'beads' ? 'ironing' : 'design')
     store.gridVersion++ // 图纸写入完成，通知画布静态层缓存失效
+    markDirty()
     showStatus(
       mode === 'beads'
         ? '豆子已自动铺好，按住拖动熨烫'

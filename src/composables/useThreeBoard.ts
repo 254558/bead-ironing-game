@@ -19,7 +19,9 @@ export interface ThreeBoardHandle {
   resize(): void
   /** 熨烫动画帧：局部更新鼠标周围珠子的熔融形态 */
   update(): void
-  /** 网格内容变化（放豆/导入/清空/载入）→ 重建珠子与图纸实例 */
+  /** 网格内容变化（放豆/导入/清空/载入）→ 下一帧合并重建珠子与图纸实例（rAF 去重，拖拽连发时每帧至多一次） */
+  requestRebuild(): void
+  /** 同步立即重建珠子与图纸实例（初始渲染 / 豆子规格切换等不能延迟的场景） */
   rebuild(): void
   /** 豆子规格切换（5mm / 2.6mm）→ 重建几何体与实例 */
   setSize(size: BeadSize): void
@@ -60,7 +62,8 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
 
   const camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 600)
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+  // pixelRatio 上限 1.5：retina 下帧缓冲像素减少约 44%，画面略软但高帧率更稳
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5))
   // Neutral tone mapping：相比 ACES 不压缩高饱和色，拼豆颜色更浓郁
   renderer.toneMapping = THREE.NeutralToneMapping
   renderer.toneMappingExposure = 1.0
@@ -86,7 +89,8 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   scene.add(key)
   scene.add(key.target) // 阴影相机跟随注视中心，无限画布平移后阴影不丢
   key.castShadow = true
-  key.shadow.mapSize.set(2048, 2048)
+  // 1024×1024：阴影 pass 更快，边缘更软；拼豆场景无细小投影细节，画质损失可忽略
+  key.shadow.mapSize.set(1024, 1024)
   const SHADOW_RANGE = 150
   key.shadow.camera.left = -SHADOW_RANGE
   key.shadow.camera.right = SHADOW_RANGE
@@ -157,7 +161,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   ironImg.src = clawdDizzyUrl
   ironImg.alt = ''
   ironImg.style.cssText =
-    'position:absolute;left:0;top:0;width:240px;height:auto;pointer-events:none;' +
+    'position:absolute;left:0;top:0;width:120px;height:auto;pointer-events:none;' +
     'transform:translate(-50%,-50%);display:none;z-index:2;'
   container.appendChild(ironImg)
 
@@ -255,16 +259,13 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     return groundPoint(nx, ny)
   }
 
-  /** 熨斗游标（clawd-dizzy.svg）：小人的脚相对游标中心（鼠标）的屏幕偏移——由 viewBox(-5,-4,22,20) 与
-   *  img 240×218 推得：脚 x 中心 7.5/22≈0.568 → +16px，脚 y15/20=0.95 → +98px */
-  const IRON_FOOT_OFFSET = { x: 16, y: 98 }
-
-  /** 熨斗图片跟随鼠标（相对画布的坐标）；同时把熨烫中心设为小人的脚踩到的地面点（脚踩到哪就烫到哪） */
+  /** 熨斗游标（clawd-dizzy.svg）：img translate(-50%,-50%) 使图标中心始终位于鼠标点，
+   *  熨烫面积以图标中心（即鼠标点正下方）为圆心，无需额外偏移 */
   function positionIron(cx: number, cy: number) {
     const rect = renderer.domElement.getBoundingClientRect()
     ironImg.style.left = `${cx - rect.left}px`
     ironImg.style.top = `${cy - rect.top}px`
-    const p = groundFromClient(cx + IRON_FOOT_OFFSET.x, cy + IRON_FOOT_OFFSET.y)
+    const p = groundFromClient(cx, cy)
     store.iron.x = p ? p.x * CELL : -1
     store.iron.y = p ? p.z * CELL : -1
   }
@@ -315,18 +316,30 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
 
   /** 写入单个珠子 instance 的矩阵/颜色（熔融形态公式，按豆子规格缩放）。
    *  网格线在整数坐标，格子 (r,c) 的方格中心 = (c+0.5, r+0.5)——拼豆放在格子中间，一格一颗。 */
+  // writeInstance / rebuildPattern 共用的 scratch 对象：setMatrixAt/setColorAt 都是拷贝写入，
+  // 连续调用间无引用残留，可安全复用，避免熨烫帧内每次调用新建 5 个临时对象
+  const scratchColor = new THREE.Color()
+  const scratchPos = new THREE.Vector3()
+  const scratchScale = new THREE.Vector3()
+  const scratchQuat = new THREE.Quaternion()
+  const scratchMatrix = new THREE.Matrix4()
+
+  /** 本帧 update() 实际写入的 mesh 集合（clear 后复用，避免每帧新建 Set） */
+  const touchedMeshes = new Set<THREE.InstancedMesh>()
+
   function writeInstance(mesh: THREE.InstancedMesh, idx: number, r: number, c: number, melt: number) {
     const { s, tol } = BEAD_SCALE[size]
     // ±0.2mm 生产公差：按 hash 确定性抖动每颗豆的尺寸，大小略有参差
     const jitter = 1 + (beadHash(r, c) - 0.5) * 2 * tol
     const h = s * jitter * BEAD_HEIGHT * (1 - melt * 0.92)
     const rad = s * jitter * (0.48 + melt * 0.18)
-    const col = new THREE.Color()
+    const col = scratchColor
     col.set(store.grid[r][c].color!)
-    const pos = new THREE.Vector3(c + 0.5, h / 2, r + 0.5)
-    const sc = new THREE.Vector3()
-    const q = new THREE.Quaternion()
-    const m4 = new THREE.Matrix4()
+    const pos = scratchPos
+    pos.set(c + 0.5, h / 2, r + 0.5)
+    const sc = scratchScale
+    const q = scratchQuat
+    const m4 = scratchMatrix
     if (mesh === filledMesh || mesh === fusedMesh) {
       // 熔融/完全熔融：圆角矩形压扁形态，随机轴向略微拉伸模拟融合方向
       const bh2 = beadHash(r, c)
@@ -420,11 +433,14 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     patternMesh = null
     if (cells.length === 0) return
     patternMesh = new THREE.InstancedMesh(patternGeo, patternMat, cells.length)
-    const m4 = new THREE.Matrix4()
-    const pos = new THREE.Vector3()
-    const sc = new THREE.Vector3(1, 1, 1)
-    const q = new THREE.Quaternion()
-    const col = new THREE.Color()
+    const m4 = scratchMatrix
+    const pos = scratchPos
+    const sc = scratchScale
+    const q = scratchQuat
+    const col = scratchColor
+    // scratch 复用：显式重置为恒等，防止残留上一轮 writeInstance 的写入
+    sc.set(1, 1, 1)
+    q.identity()
     for (let i = 0; i < cells.length; i++) {
       // 色块同样居中在方格内（+0.5），放豆后由珠子盖住
       pos.set(cells[i].c + 0.5, 0.02, cells[i].r + 0.5)
@@ -586,7 +602,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
 
   function update() {
     if (store.mode !== 'ironing' || store.mouse.x < 0) return
-    // 渲染更新区域与熔融判定一致：以小人的脚（熨烫中心）为圆心
+    // 渲染更新区域与熔融判定一致：以熨斗图标中心（熨烫中心）为圆心
     const mx = store.iron.x / CELL
     const mz = store.iron.y / CELL
     const rad = (IRON_RADIUS * 1.5) / CELL
@@ -594,7 +610,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     const c1 = Math.min(store.cols - 1, Math.ceil(mx + rad))
     const r0 = Math.max(0, Math.floor(mz - rad))
     const r1 = Math.min(store.rows - 1, Math.ceil(mz + rad))
-    // 有珠子跨过熔融形态边界（hollow ↔ filled ↔ fused）→ 全量重建
+    // 有珠子跨过熔融形态边界（hollow ↔ filled ↔ fused）→ 下一帧合并重建
     const formOf = (m: number) => (m >= FUSE_SEALED ? 2 : m >= 0.35 ? 1 : 0)
     for (let r = r0; r <= r1; r++)
       for (let c = c0; c <= c1; c++) {
@@ -604,40 +620,45 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
         if (!entry) continue
         const entryForm = entry.mesh === fusedMesh ? 2 : entry.mesh === filledMesh ? 1 : 0
         if (formOf(cell.melt) !== entryForm) {
-          buildBeadInstances()
+          requestRebuild()
           return
         }
       }
-    // 局部更新鼠标周围珠子的矩阵/颜色
-    let dirty = false
+    // 局部更新鼠标周围珠子的矩阵/颜色；只标记实际写入的 mesh，未动的 buffer 不整块重传
+    touchedMeshes.clear()
     for (let r = r0; r <= r1; r++)
       for (let c = c0; c <= c1; c++) {
         const cell = store.grid[r][c]
         if (!cell.color) continue
         const entry = beadIndex.get(r * MAX_GRID + c)
         if (!entry) continue
+        touchedMeshes.add(entry.mesh)
         writeInstance(entry.mesh, entry.idx, r, c, cell.melt)
-        dirty = true
       }
-    if (dirty) {
-      if (hollowMesh) {
-        hollowMesh.instanceMatrix.needsUpdate = true
-        if (hollowMesh.instanceColor) hollowMesh.instanceColor.needsUpdate = true
-      }
-      if (filledMesh) {
-        filledMesh.instanceMatrix.needsUpdate = true
-        if (filledMesh.instanceColor) filledMesh.instanceColor.needsUpdate = true
-      }
-      if (fusedMesh) {
-        fusedMesh.instanceMatrix.needsUpdate = true
-        if (fusedMesh.instanceColor) fusedMesh.instanceColor.needsUpdate = true
-      }
+    for (const m of touchedMeshes) {
+      m.instanceMatrix.needsUpdate = true
+      if (m.instanceColor) m.instanceColor.needsUpdate = true
     }
   }
 
   function rebuild() {
     buildBeadInstances()
     rebuildPattern()
+  }
+
+  let rebuildPending = false
+  let rebuildRaf = 0
+
+  /** 内容变化 → 下一帧合并重建（同一帧内多次触发只重建一次）。
+   *  拖拽放豆/6×6 擦除每个 pointermove 都可能触发 gridVersion++，同步全量重建会反复
+   *  扫描整表 + 新建 InstancedMesh；延迟一帧后肉眼不可见，重建次数从“每 move”降到“每帧一次” */
+  function requestRebuild() {
+    if (rebuildPending) return
+    rebuildPending = true
+    rebuildRaf = requestAnimationFrame(() => {
+      rebuildPending = false
+      rebuild()
+    })
   }
 
   /** 豆子规格切换：几何体（孔径/壁厚）随规格重建，实例整体重建 */
@@ -655,6 +676,8 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
 
   function dispose() {
     cancelAnimationFrame(raf)
+    cancelAnimationFrame(rebuildRaf)
+    rebuildPending = false
     controls.dispose()
     renderer.dispose()
     renderer.domElement.remove()
@@ -697,5 +720,5 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   rebuild()
   animate()
 
-  return { resize, update, rebuild, setSize, dispose }
+  return { resize, update, requestRebuild, rebuild, setSize, dispose }
 }

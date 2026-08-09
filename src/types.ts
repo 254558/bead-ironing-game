@@ -28,15 +28,6 @@ export interface IronCenter {
   y: number
 }
 
-export interface IronProgress {
-  avg: number
-  fused: number
-  burned: number
-  count: number
-  fillColor: string
-  label: string
-}
-
 /** 已保存的一幅作品（点「恢复」列表取回，无拖拽/旋转/缩放姿态） */
 export interface SavedBoard {
   id: string

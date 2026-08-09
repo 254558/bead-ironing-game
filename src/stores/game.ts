@@ -1,5 +1,5 @@
 import { computed, reactive } from 'vue'
-import type { BeadSize, Cell, ImportMode, IronCenter, IronProgress, Mode, MouseState, SavedBoard } from '../types'
+import type { BeadSize, Cell, ImportMode, IronCenter, Mode, MouseState, SavedBoard } from '../types'
 import { CELL, COLORS } from '../utils/color'
 import { renderThumb } from '../utils/thumbnail'
 
@@ -113,10 +113,6 @@ export const store = reactive({
   viewMode: false,
   status: '',
   statusVisible: false,
-  progress: {
-    avg: 0, fused: 0, burned: 0, count: 0,
-    fillColor: '#41a6f6', label: '熨烫进度',
-  } as IronProgress,
   /** 窗口 resize 后 +1，通知画布/3D 重新适配 */
   resizeTick: 0,
   /** 已保存的作品列表（localStorage 持久化，点「恢复」展示） */
@@ -163,6 +159,7 @@ export function expandGridKeep(minCols: number, minRows: number) {
   store.cols = nc
   store.rows = nr
   store.gridVersion++ // 网格线数量变化，静态层缓存失效
+  markDirty()
 }
 
 /**
@@ -189,29 +186,50 @@ export function getCellAt(x: number, y: number): { r: number; c: number } | null
   return r < 0 || r >= store.rows || c < 0 || c >= store.cols ? null : { r, c }
 }
 
+/** 橡皮擦除范围：以命中格为基准，向上 2 格、向下 3 格（6×6），越界自动裁剪 */
+const ERASE_HALF_UP = 2
+const ERASE_SIZE = 6
+
+/** 擦除以 (r0, c0) 为基准的 6×6 区域（内容实际变化时递增 gridVersion，供缓存失效） */
+export function eraseArea(r0: number, c0: number) {
+  const r1 = Math.max(0, r0 - ERASE_HALF_UP)
+  const r2 = Math.min(store.rows - 1, r0 - ERASE_HALF_UP + ERASE_SIZE - 1)
+  const c1 = Math.max(0, c0 - ERASE_HALF_UP)
+  const c2 = Math.min(store.cols - 1, c0 - ERASE_HALF_UP + ERASE_SIZE - 1)
+  let changed = false
+  for (let r = r1; r <= r2; r++)
+    for (let c = c1; c <= c2; c++) {
+      const cell = store.grid[r][c]
+      if (cell.color === null) continue
+      cell.color = null
+      cell.melt = 0
+      changed = true
+    }
+  if (changed) {
+    store.gridVersion++
+    markDirty()
+  }
+}
+
 /** 画布坐标放置珠子 / 橡皮擦除（内容实际变化时递增 gridVersion，供缓存失效） */
 export function placeBead(x: number, y: number) {
   const cell = getCellAt(x, y)
   if (!cell) return
-  const target = store.grid[cell.r][cell.c]
   if (store.isEraser) {
-    if (target.color === null) return
-    target.color = null
-    target.melt = 0
-  } else {
-    if (target.color === store.selectedColor) return
-    target.color = store.selectedColor
-    target.melt = 0
+    eraseArea(cell.r, cell.c)
+    return
   }
+  const target = store.grid[cell.r][cell.c]
+  if (target.color === store.selectedColor) return
+  target.color = store.selectedColor
+  target.melt = 0
   store.gridVersion++
+  markDirty()
 }
 
+/** 右键擦除：同样删除 6×6 区域 */
 export function eraseCell(r: number, c: number) {
-  const cell = store.grid[r][c]
-  if (cell.color === null) return
-  cell.color = null
-  cell.melt = 0
-  store.gridVersion++
+  eraseArea(r, c)
 }
 
 export function clearAll() {
@@ -222,6 +240,7 @@ export function clearAll() {
       cell.pixel = null
     }
   store.gridVersion++
+  markDirty()
   switchMode('design')
 }
 
@@ -243,7 +262,10 @@ export function switchMode(m: Mode) {
           cell.melt = 0
           touched = true
         }
-    if (touched) store.gridVersion++
+    if (touched) {
+      store.gridVersion++
+      markDirty()
+    }
   } else {
     msg = '按住拖动来熨烫'
   }
@@ -260,6 +282,7 @@ export function setBeadSize(size: BeadSize) {
   if (store.beadSize === size) return
   store.beadSize = size
   store.gridVersion++
+  markDirty()
   showStatus(
     size === 'big'
       ? '大豆 5mm：新手友好，可手拿摆放'
@@ -300,6 +323,7 @@ export function loadBoard(id: string) {
   store.rows = board.rows
   store.grid = board.grid.map((row) => row.map((cell) => ({ ...cell })))
   store.gridVersion++
+  markDirty()
   store.mode = 'design' // 直接赋值：避免 switchMode 清零 melt
   store.showSavePanel = false
   showStatus(`已载入「${board.name}」`)
@@ -318,14 +342,18 @@ export function setSavePanel(show: boolean) {
 
 const AUTOSAVE_INTERVAL = 5000
 
-/** 最近一次写入的网格快照，避免无变化时重复写 localStorage */
-let autoSnap = ''
+/** 内容脏标记：放豆/擦除/熨烫/导入/清空/载入等真实内容变化后置位，空闲时自动保存零开销 */
+let contentDirty = false
+
+/** 标记画布内容发生变化（供 autosaveNow 判断是否需要写入） */
+export function markDirty() {
+  contentDirty = true
+}
 
 /** 把当前画布整体写入自动存档（空板不覆盖旧档，保证误触清空后仍能找回） */
 export function autosaveNow() {
-  const snap = JSON.stringify({ cols: store.cols, rows: store.rows, grid: store.grid })
-  if (snap === autoSnap) return
-  autoSnap = snap
+  if (!contentDirty) return
+  contentDirty = false
   if (!hasContent()) return
   try {
     localStorage.setItem(
@@ -351,6 +379,3 @@ export function stopAutosave() {
   autoTimer = undefined
   window.removeEventListener('beforeunload', autosaveNow)
 }
-
-// 记录初始快照：启动时若已恢复存档，不重复写入
-autoSnap = JSON.stringify({ cols: store.cols, rows: store.rows, grid: store.grid })

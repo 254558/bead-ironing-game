@@ -18,10 +18,11 @@ watch(
   },
 )
 
-// 网格内容变化（放豆/擦除/导入/清空/载入/熔融复位）→ 重建珠子与图纸实例
+// 网格内容变化（放豆/擦除/导入/清空/载入/熔融复位）→ 下一帧合并重建珠子与图纸实例。
+// 拖拽连续放豆时每个 pointermove 都递增 gridVersion，requestRebuild 按帧去重，避免每 move 全量重建
 watch(
   () => store.gridVersion,
-  () => board?.rebuild(),
+  () => board?.requestRebuild(),
 )
 
 // 豆子规格切换（5mm / 2.6mm）→ 重建几何体与实例

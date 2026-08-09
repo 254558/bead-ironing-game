@@ -4,8 +4,8 @@ import type { BeadSize } from '../types'
 export const CELL = 14
 export const DISPLAY_CELL = 36
 export const BEAD_R = 6
-/** 熨烫半径（×14 单位 ≈ 格数）：≈1 格，脚踩住一颗珠烫，覆盖 3×3 左右 */
-export const IRON_RADIUS = 14
+/** 熨烫半径（×14 单位 ≈ 格数）：≈7 格，以熨斗图标中心为圆心，覆盖约 15×15 格 */
+export const IRON_RADIUS = 98
 export const FUSE_MIN = 0.3
 export const FUSE_MAX = 0.7
 /** 孔洞完全闭合的熔融下限：烫到此处起珠子无孔，保持到烫糊前（「刚好」容错区间） */

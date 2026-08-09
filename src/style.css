@@ -176,7 +176,7 @@ body {
 
 /* ---------- 舞台 ---------- */
 /* 3D 棋盘铺满整个窗口（侧栏透明，悬浮于棋盘之上）。
-   z-index 保持 auto：不建立层叠上下文，SavePanel(z-8)/IronProgress(z-50) 等覆盖层
+   z-index 保持 auto：不建立层叠上下文，SavePanel(z-8) 等覆盖层
    仍能盖过侧栏（z-1）。 */
 .canvas-wrap {
   position: absolute;
@@ -211,63 +211,6 @@ body {
 
 .scroll-wrap.view-mode.view-dragging canvas {
   cursor: grabbing;
-}
-
-/* ---------- 熨烫进度 ---------- */
-.iron-progress {
-  display: none;
-  position: absolute;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 320px;
-  background: #22262e;
-  border: 1px solid #343b46;
-  border-radius: 10px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
-  padding: 10px 12px;
-  z-index: 50;
-}
-
-.iron-progress.show {
-  display: block;
-}
-
-.progress-label {
-  font-size: 12px;
-  text-align: center;
-  margin-bottom: 6px;
-  color: #98a0ac;
-}
-
-.progress-bar {
-  position: relative;
-  height: 14px;
-}
-
-/* PrimeVue ProgressBar 适配：高度/圆角/填充色（填充色由 IronProgress 注入 --iron-fill） */
-.iron-progress .p-progressbar {
-  height: 14px;
-  background: #1a1e24;
-  border: 1px solid #343b46;
-  border-radius: 7px;
-}
-
-.iron-progress .p-progressbar-value {
-  background: var(--iron-fill, #41a6f6);
-  border-radius: 7px;
-}
-
-.progress-zone {
-  position: absolute;
-  top: 0;
-  left: 30%;
-  width: 40%;
-  height: 100%;
-  border-left: 1px dashed #34a853;
-  border-right: 1px dashed #34a853;
-  pointer-events: none;
-  z-index: 2;
 }
 
 

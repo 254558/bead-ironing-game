@@ -1,40 +1,5 @@
-import { store } from '../stores/game'
-import { burnAt, CELL, FUSE_MAX, FUSE_MIN, IRON_RADIUS, IRON_SPEED } from '../utils/color'
-
-/** 统计并刷新熨烫进度（写入 store.progress，供 IronProgress 组件展示） */
-function updateIronProgress() {
-  const burn = burnAt(store.beadSize)
-  let total = 0
-  let fused = 0
-  let burned = 0
-  let count = 0
-  for (let r = 0; r < store.rows; r++) {
-    for (let c = 0; c < store.cols; c++) {
-      const cell = store.grid[r][c]
-      if (!cell.color) continue
-      count++
-      total += cell.melt
-      if (cell.melt >= FUSE_MIN && cell.melt <= FUSE_MAX) fused++
-      else if (cell.melt > burn) burned++
-    }
-  }
-  if (count === 0) return
-  const avg = total / count
-  store.progress.avg = avg
-  store.progress.count = count
-  store.progress.fused = fused
-  store.progress.burned = burned
-  store.progress.fillColor =
-    avg > burn ? '#b13e53' : avg > FUSE_MAX ? '#ffcd75' : avg > FUSE_MIN ? '#38b764' : '#41a6f6'
-  store.progress.label =
-    burned > 0
-      ? `!! ${burned} BURNED ${fused}/${count}`
-      : fused === count
-        ? `OK! ${fused}/${count}`
-        : avg > FUSE_MAX
-          ? `CAREFUL ${fused}/${count}`
-          : `IRONING ${fused}/${count}`
-}
+import { markDirty, store } from '../stores/game'
+import { CELL, IRON_RADIUS, IRON_SPEED } from '../utils/color'
 
 /**
  * 熨烫 rAF 循环：按住鼠标时按椭圆衰减半径累计 melt。
@@ -56,24 +21,33 @@ export function useIroning(render: () => void) {
     if (store.mouse.down && store.mouse.x >= 0 && store.iron.x >= 0) {
       // 迷你豆壁薄升温快：熔化速度 ×1.2，更容易烫糊
       const speed = IRON_SPEED * (store.beadSize === 'mini' ? 1.2 : 1)
-      for (let r = 0; r < store.rows; r++) {
-        for (let c = 0; c < store.cols; c++) {
+      // 只遍历熨斗周围的热区窗口（椭圆最大半轴 R*1.25，+1 格余量），避免每帧全表扫描
+      const rad = Math.ceil((IRON_RADIUS * 1.25) / CELL) + 1
+      const c0 = Math.max(0, Math.floor(store.iron.x / CELL - rad))
+      const c1 = Math.min(store.cols - 1, Math.ceil(store.iron.x / CELL + rad))
+      const r0 = Math.max(0, Math.floor(store.iron.y / CELL - rad))
+      const r1 = Math.min(store.rows - 1, Math.ceil(store.iron.y / CELL + rad))
+      let wrote = false
+      for (let r = r0; r <= r1; r++) {
+        for (let c = c0; c <= c1; c++) {
           const cell = store.grid[r][c]
           if (!cell.color) continue
           const cx = c * CELL + CELL / 2
           const cy = r * CELL + CELL / 2
-          // 以小人的脚（熨烫中心）为圆心：脚踩到哪就烫到哪
+          // 以熨斗图标中心（熨烫中心）为圆心：图标指到哪就烫到哪
           const ex = (cx - store.iron.x) / (IRON_RADIUS * 1.25)
           const ey = (cy - store.iron.y) / (IRON_RADIUS * 1.15)
           const d2 = ex * ex + ey * ey
           if (d2 < 1) {
             const f = 1 - Math.sqrt(d2)
             cell.melt = Math.min(1, cell.melt + speed * f * dt)
+            wrote = true
           }
         }
       }
+      // 熔融有变化 → 标记内容变脏（供自动保存按需写入）
+      if (wrote) markDirty()
     }
-    updateIronProgress()
     render()
     raf = requestAnimationFrame(loop)
   }
