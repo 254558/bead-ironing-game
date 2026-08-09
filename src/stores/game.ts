@@ -227,9 +227,15 @@ export function placeBead(x: number, y: number) {
   markDirty()
 }
 
-/** 右键擦除：同样删除 6×6 区域 */
+/** 右键擦除：精细擦除，只删除命中的 1 颗豆（区别于橡皮工具的 6×6 区域） */
 export function eraseCell(r: number, c: number) {
-  eraseArea(r, c)
+  if (r < 0 || r >= store.rows || c < 0 || c >= store.cols) return
+  const cell = store.grid[r][c]
+  if (cell.color === null) return
+  cell.color = null
+  cell.melt = 0
+  store.gridVersion++
+  markDirty()
 }
 
 export function clearAll() {
