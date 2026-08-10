@@ -32,8 +32,8 @@ function onFileChange(e: Event) {
           <span class="import-dialog-btn-sub">只显示像素参考图，自己对照放豆</span>
         </button>
         <button class="import-dialog-btn import-dialog-btn-beads" @click="choose('beads')">
-          <span class="import-dialog-btn-title">直接变成豆子</span>
-          <span class="import-dialog-btn-sub">自动铺好豆子，你只需要熨烫</span>
+          <span class="import-dialog-btn-title">从图纸生成豆子</span>
+          <span class="import-dialog-btn-sub">识别图纸网格（40×40 等标准图纸精确还原），自动铺好豆子，你只需要熨烫</span>
         </button>
         <button class="import-dialog-cancel" @click="store.showImportDialog = false">取消</button>
       </div>

@@ -165,7 +165,7 @@
 
   clip-path: var(--clip);
   --mask: none;
-  --foil: url("../../img/illusion.png"); 
+  --foil: url("/img/illusion.png"); 
   --imgsize: 33%;
 
   -webkit-mask-image: var(--mask);

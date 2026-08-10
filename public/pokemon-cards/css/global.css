@@ -4,21 +4,21 @@
    ═══════════════════════════════════════════════ */
 @font-face {
   font-family: "GeistSans";
-  src: url("../fonts/caa3a2e1cccd8315.p.0wgildi0cnwt9.woff2") format("woff2");
+  src: url("/fonts/caa3a2e1cccd8315.p.0wgildi0cnwt9.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "GeistMono";
-  src: url("../fonts/GeistMono_Variable-s.p.1bcgm0qa26ixg.woff2") format("woff2");
+  src: url("/fonts/GeistMono_Variable-s.p.1bcgm0qa26ixg.woff2") format("woff2");
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "GeistPixelCircle";
-  src: url("../fonts/GeistPixel_Circle.p.3zurfnrwei_77.woff2") format("woff2");
+  src: url("/fonts/GeistPixel_Circle.p.3zurfnrwei_77.woff2") format("woff2");
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -95,6 +95,26 @@ h3 {
   letter-spacing: 0.05em;
   color: rgba(237, 237, 237, 0.55);
   white-space: nowrap;
+}
+
+/* 返回拼豆主界面的链接按钮（与 meta 文字同风格，hover 高亮） */
+.ship-section__back {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: uppercase;
+  color: rgba(237, 237, 237, 0.55);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.3s ease;
+}
+
+.ship-section__back:hover {
+  color: #ffd54a;
+  text-decoration: underline;
 }
 
 @media screen and (max-width: 600px) {

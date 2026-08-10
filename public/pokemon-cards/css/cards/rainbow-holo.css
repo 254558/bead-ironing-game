@@ -138,7 +138,7 @@
 .card:not(.masked)[data-rarity="rare rainbow"] .card__shine {
 
   clip-path: var(--clip);
-  --foil: url("../../img/illusion-mask.png"); 
+  --foil: url("/img/illusion-mask.png"); 
   --imgsize: 33%;
 
 }
