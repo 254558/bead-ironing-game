@@ -3,8 +3,8 @@ import { computed } from 'vue'
 import LineSidebar from './bits/LineSidebar.vue'
 import { clearAll, hasBeads, saveBoard, setSavePanel, showStatus, store, switchMode } from '../stores/game'
 
-/** 左侧工具菜单（vue-bits LineSidebar）：设计 / 熨烫 / 视角 / 导入 / 保存 / 恢复 / 清空 */
-const items = ['设计', '熨烫', '视角', '导入', '保存', '恢复', '清空']
+/** 左侧工具菜单（vue-bits LineSidebar）：设计 / 熨烫 / 视角 / 导入 / 图纸 / 保存 / 恢复 / 清空 */
+const items = ['设计', '熨烫', '视角', '导入', '图纸', '保存', '恢复', '清空']
 
 /** 高亮项随模式/视角工具状态联动（外部受控） */
 const active = computed(() => (store.viewMode ? 2 : store.mode === 'ironing' ? 1 : 0))
@@ -36,13 +36,17 @@ function onItemClick(index: number) {
       store.showImportDialog = true
       break
     case 4:
+      // 图纸库：宝可梦卡牌全息效果参考页（全屏 iframe，右上/左上返回）
+      store.cardsView = true
+      break
+    case 5:
       if (hasBeads) saveBoard()
       else showStatus('还没有拼豆可保存')
       break
-    case 5:
+    case 6:
       setSavePanel(true)
       break
-    case 6:
+    case 7:
       clearAll()
       break
   }

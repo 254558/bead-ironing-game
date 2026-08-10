@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+		<!-- meta -->
+		<title>Pokémon Cards CSS Holographic Effect</title>
+		<meta name="description" content="An exploration of what's possible with CSS for Pokemon Cards, simeydotme (Simon Goellner)" />
+		
+		<link rel="icon" href="favicon.png" />
+		<meta name="thumbnail" content="thumb.png" />
+
+		<!-- fonts: Geist 自托管于 public/fonts/，不依赖 Google Fonts -->
+
+		<!-- styles -->
+		<link rel="stylesheet" href="css/global.css" />
+		
+		<link rel="stylesheet" href="css/cards/base.css" />
+		<link rel="stylesheet" href="css/cards.css" />
+		<link rel="stylesheet" href="css/cards/basic.css" />
+		<link rel="stylesheet" href="css/cards/reverse-holo.css" />
+		<link rel="stylesheet" href="css/cards/regular-holo.css" />
+		<link rel="stylesheet" href="css/cards/cosmos-holo.css" />
+		<link rel="stylesheet" href="css/cards/amazing-rare.css" />
+		<link rel="stylesheet" href="css/cards/radiant-holo.css" />
+		<link rel="stylesheet" href="css/cards/v-regular.css" />
+		<link rel="stylesheet" href="css/cards/v-full-art.css" />
+		<link rel="stylesheet" href="css/cards/v-max.css" />
+		<link rel="stylesheet" href="css/cards/v-star.css" />
+		<link rel="stylesheet" href="css/cards/trainer-full-art.css" />
+		<link rel="stylesheet" href="css/cards/rainbow-holo.css" />
+		<link rel="stylesheet" href="css/cards/rainbow-alt.css" />
+		<link rel="stylesheet" href="css/cards/secret-rare.css" />
+		<link rel="stylesheet" href="css/cards/trainer-gallery-holo.css" />
+		<link rel="stylesheet" href="css/cards/trainer-gallery-v-regular.css" />
+		<link rel="stylesheet" href="css/cards/trainer-gallery-v-max.css" />
+		<link rel="stylesheet" href="css/cards/trainer-gallery-secret-rare.css" />
+		<link rel="stylesheet" href="css/cards/shiny-rare.css" />
+		<link rel="stylesheet" href="css/cards/shiny-v.css" />
+		<link rel="stylesheet" href="css/cards/shiny-vmax.css" />
+		<link rel="stylesheet" href="css/cards/swsh-pikachu.css" />
+		<link rel="stylesheet" href="css/cards/patterns.css" />
+
+		<script type="module" crossorigin src="./assets/index.d9454079.js"></script>
+		<link rel="stylesheet" href="./assets/index.2894a8cf.css">
+	</head>
+	<body>
+
+    <div id="app"></div>
+
+    <!-- 点顶部 "Patterns" 标题返回拼豆应用：通知父页面关闭图纸视图 -->
+    <script>
+      (function () {
+        var tries = 0;
+        var timer = setInterval(function () {
+          var h = document.querySelector('.ship-section__title') || document.querySelector('h2');
+          if (h) {
+            clearInterval(timer);
+            h.style.cursor = 'pointer';
+            h.title = '返回拼豆';
+            h.addEventListener('mouseenter', function () { h.style.color = '#ffd166'; });
+            h.addEventListener('mouseleave', function () { h.style.color = ''; });
+            h.addEventListener('click', function () {
+              window.parent.postMessage({ type: 'bead-close-cards' }, '*');
+            });
+          } else if (++tries > 100) {
+            clearInterval(timer);
+          }
+        }, 120);
+      })();
+    </script>
+
+	</body>
+</html>

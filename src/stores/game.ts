@@ -102,6 +102,8 @@ export const store = reactive({
   importMode: 'pattern' as ImportMode,
   /** 导入方式选择对话框开关（点「导入」后先问怎么导） */
   showImportDialog: false,
+  /** 图纸库：宝可梦卡牌全息效果参考页（全屏 iframe），打开时盖住整个应用 */
+  cardsView: false,
   mouse: { x: -1, y: -1, down: false } as MouseState,
   /** 熨烫中心：游标小人的脚踩到的地面点（脚的位置 = 鼠标 + 图标脚偏移），脚踩到哪就烫到哪 */
   iron: { x: -1, y: -1 } as IronCenter,
