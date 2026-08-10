@@ -4,21 +4,21 @@
    ═══════════════════════════════════════════════ */
 @font-face {
   font-family: "GeistSans";
-  src: url("/fonts/caa3a2e1cccd8315.p.0wgildi0cnwt9.woff2") format("woff2");
+  src: url("../fonts/caa3a2e1cccd8315.p.0wgildi0cnwt9.woff2") format("woff2");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "GeistMono";
-  src: url("/fonts/GeistMono_Variable-s.p.1bcgm0qa26ixg.woff2") format("woff2");
+  src: url("../fonts/GeistMono_Variable-s.p.1bcgm0qa26ixg.woff2") format("woff2");
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "GeistPixelCircle";
-  src: url("/fonts/GeistPixel_Circle.p.3zurfnrwei_77.woff2") format("woff2");
+  src: url("../fonts/GeistPixel_Circle.p.3zurfnrwei_77.woff2") format("woff2");
   font-weight: normal;
   font-style: normal;
   font-display: swap;
