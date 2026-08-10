@@ -56,9 +56,12 @@
   
   /* make sure the card is above others if it's scaled up */
   z-index: calc(var(--card-scale) * 2);
-  
-  /* every little helps! */
-  will-change: transform, visibility, z-index;
+
+  /* 性能优化：视口外的卡（38 张网格里约 30 张）完全跳过渲染，
+     滚动时只合成可见的几张；contain-intrinsic-size 让跳过的卡保持
+     原大小（auto 记录上次实际尺寸），避免网格行高塌陷。 */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 350px 487px;
 
   /* this prevents major problems in firefox, but also causes a bit of
   clipping as the card animates to/from active state. worth it. */
