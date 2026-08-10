@@ -12,7 +12,7 @@ function onMessage(e: MessageEvent) {
   if (e.data && typeof e.data === 'object' && e.data.type === 'bead-close-cards') close()
 }
 
-/** Esc 键退出图纸库（全屏 iframe 盖住了左侧菜单，必须给用户一个明显的退出途径） */
+/** Esc 键退出图纸库（iframe 顶部「Patterns」可点击返回，Esc 作为补充出口） */
 function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') close()
 }
@@ -35,10 +35,6 @@ onUnmounted(() => {
       src="pokemon-cards/index.html"
       title="图纸库 · 宝可梦卡牌全息效果"
     />
-    <!-- 明显的返回按钮：悬停/点击时让 iframe 失焦，避免被 iframe 盖住菜单后无法退出 -->
-    <button class="cards-view-back" @click="close" title="关闭图纸库，回到拼豆画布（Esc 也可以）">
-      ← 返回拼豆
-    </button>
   </div>
 </template>
 
@@ -55,27 +51,5 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   border: 0;
-}
-
-.cards-view-back {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  z-index: 5; /* 相对 .cards-view，iframe 之上 */
-  padding: 8px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 999px;
-  background: rgba(15, 17, 22, 0.75);
-  color: #e8e8e8;
-  font-size: 14px;
-  cursor: pointer;
-  backdrop-filter: blur(6px);
-  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
-}
-
-.cards-view-back:hover {
-  background: rgba(255, 213, 74, 0.15);
-  border-color: rgba(255, 213, 74, 0.6);
-  color: #ffd54a;
 }
 </style>
