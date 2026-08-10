@@ -24,6 +24,12 @@
   --card-back: hsl(205, 100%, 25%);
   --card-glow: hsl(175, 100%, 90%);
 
+  /* 纹理图：用 ../../img/ 相对路径（相对 css/cards/），
+     保证 var() 注入到 css/cards/*.css 的规则后仍能解析到 /img/ */
+  --grain: url("../../img/grain.webp");
+  --glitter: url("../../img/glitter.png");
+  --glittersize: 25%;
+
   --sunpillar-1: hsl(2, 100%, 73%);
   --sunpillar-2: hsl(53, 100%, 69%);
   --sunpillar-3: hsl(93, 100%, 69%);

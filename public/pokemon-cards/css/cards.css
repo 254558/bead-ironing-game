@@ -1,10 +1,6 @@
 
 .card {
 
-  --grain: url("../img/grain.webp");
-  --glitter: url("../img/glitter.png");
-  --glittersize: 25%;
-
   --space: 5%;
   --angle: 133deg;
   --imgsize: cover;
