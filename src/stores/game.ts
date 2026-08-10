@@ -102,6 +102,8 @@ export const store = reactive({
   importMode: 'pattern' as ImportMode,
   /** 导入方式选择对话框开关（点「导入」后先问怎么导） */
   showImportDialog: false,
+  /** 内置图纸选择器开关（点「导入」→「从内置图纸选」后打开，从 38 张图纸挑一张自动放豆） */
+  showPatternPicker: false,
   /** 图纸库：宝可梦卡牌全息效果参考页（全屏 iframe），打开时盖住整个应用 */
   cardsView: false,
   mouse: { x: -1, y: -1, down: false } as MouseState,

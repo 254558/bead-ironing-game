@@ -2,6 +2,7 @@
 import CardsView from './components/CardsView.vue'
 import ColorWheelPanel from './components/ColorWheelPanel.vue'
 import ImportDialog from './components/ImportDialog.vue'
+import PatternPicker from './components/PatternPicker.vue'
 import Stage from './components/Stage.vue'
 import ToolPanel from './components/ToolPanel.vue'
 import { store } from './stores/game'
@@ -17,6 +18,7 @@ import { store } from './stores/game'
       <ColorWheelPanel />
     </aside>
     <ImportDialog />
+    <PatternPicker v-if="store.showPatternPicker" />
     <CardsView v-if="store.cardsView" />
   </div>
 </template>
