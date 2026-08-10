@@ -3,7 +3,7 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { store } from '../stores/game'
 import { importImage } from '../composables/useImageImport'
 
-/** 38 张内置图纸（与图纸库 pokemon-cards/patterns/ 一一对应，1024×1024、40×40 标准网格图纸） */
+/** 38 张内置图纸（与图纸库 pattens/patterns/ 一一对应，1024×1024、40×40 标准网格图纸） */
 const PATTERNS = [
   'Rainbow Alt', 'Radiant', 'Reverse Holo', 'Pikachu Promo', 'Cosmos',
   'TG V', 'TG Gold', 'Shiny V', 'Regular Holo', 'Plain (No Foil)',
@@ -13,7 +13,7 @@ const PATTERNS = [
   'Gold Secret', 'TG VMAX', 'Amazing Rare', 'Cosmos', 'VSTAR',
   'VSTAR', 'Ultra Full Art', 'Pikachu Promo', 'Ultra Full Art', 'Regular Holo',
   'Rainbow Alt', 'Plain (No Foil)', 'Amazing Rare',
-].map((name, i) => ({ name, src: `pokemon-cards/patterns/p${String(i + 1).padStart(2, '0')}.webp` }))
+].map((name, i) => ({ name, src: `pattens/patterns/p${String(i + 1).padStart(2, '0')}.webp` }))
 
 const loading = ref('')
 

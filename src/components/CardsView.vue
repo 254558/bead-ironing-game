@@ -29,10 +29,10 @@ onUnmounted(() => {
 
 <template>
   <div class="cards-view">
-    <!-- 全屏 iframe：宝可梦卡牌全息效果参考页（静态资源位于 public/pokemon-cards/） -->
+    <!-- 全屏 iframe：宝可梦卡牌全息效果参考页（静态资源位于 public/pattens/） -->
     <iframe
       class="cards-view-frame"
-      src="pokemon-cards/index.html"
+      src="pattens/index.html"
       title="图纸库 · 宝可梦卡牌全息效果"
     />
   </div>
