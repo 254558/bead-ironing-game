@@ -1,0 +1,22 @@
+/*
+
+  PATTERN SHOWCASE
+
+  Cards in the pattern showcase use full-bleed pixel patterns, so
+  the holo foil should cover the whole card instead of being clipped
+  to the artwork window.
+
+  Triggered by the "pattern" type class on the card.
+
+*/
+
+.card.pattern .card__shine,
+.card.pattern .card__shine:before,
+.card.pattern .card__shine:after,
+.card.pattern .card__glare,
+.card.pattern .card__glare:before,
+.card.pattern .card__glare:after {
+
+  clip-path: none !important;
+
+}

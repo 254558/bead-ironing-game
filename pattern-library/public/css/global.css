@@ -1,0 +1,125 @@
+/* ═══════════════════════════════════════════════
+   Pokémon Cards CSS Holographic Effect
+   ── 字体：Vercel Ship（Geist）──
+   ═══════════════════════════════════════════════ */
+@font-face {
+  font-family: "GeistSans";
+  src: url("../fonts/caa3a2e1cccd8315.p.0wgildi0cnwt9.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "GeistMono";
+  src: url("../fonts/GeistMono_Variable-s.p.1bcgm0qa26ixg.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "GeistPixelCircle";
+  src: url("../fonts/GeistPixel_Circle.p.3zurfnrwei_77.woff2") format("woff2");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ── 基础 ── */
+* {
+  box-sizing: border-box;
+}
+
+body,
+html {
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: GeistSans, system-ui, sans-serif;
+  background-color: #000;
+}
+
+main {
+  color: white;
+  padding: 0 50px 50px;
+  max-width: 1200px;
+  margin: auto;
+}
+
+h1,
+h2,
+h3 {
+  font-family: "GeistPixelCircle", system-ui, sans-serif;
+}
+
+/* ── Patterns 区头（Vercel Ship 风格） ── */
+.ship-section__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 2rem 0 1.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.ship-section__title {
+  margin: 0;
+  font-family: "GeistPixelCircle", system-ui, sans-serif;
+  font-size: clamp(2.2rem, 5vw, 3.75rem);
+  letter-spacing: -2px;
+  font-weight: normal;
+  color: #fff;
+}
+
+.ship-section__title-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* 像素字体的字形带内边距，方框微调对齐文字视觉中心 */
+.ship-section__title-row .shuffle-code {
+  transform: translateY(5px);
+}
+
+.ship-section__meta {
+  margin: 0;
+  font-family: "GeistMono", ui-monospace, monospace;
+  font-style: normal;
+  text-transform: uppercase;
+  font-size: 0.875rem;
+  letter-spacing: 0.05em;
+  color: rgba(237, 237, 237, 0.55);
+  white-space: nowrap;
+}
+
+/* 返回拼豆主界面的链接按钮（与 meta 文字同风格，hover 高亮） */
+.ship-section__back {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: uppercase;
+  color: rgba(237, 237, 237, 0.55);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.3s ease;
+}
+
+.ship-section__back:hover {
+  color: #ffd54a;
+  text-decoration: underline;
+}
+
+@media screen and (max-width: 600px) {
+  .ship-section__head {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}

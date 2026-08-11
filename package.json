@@ -3,9 +3,13 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "workspaces": [
+    "pattern-library"
+  ],
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc -b && vite build",
+    "build": "npm run build:patterns && vue-tsc -b && vite build",
+    "build:patterns": "node scripts/sync-pattens.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -21,7 +21,7 @@
 要求：Node.js ≥ 20.19（Vite 8 需要），npm
 
 ```bash
-# 安装依赖
+# 安装依赖（会同时安装 workspace 图纸库的依赖）
 npm install
 
 # 启动开发服务器（默认 http://localhost:5173/）
@@ -31,8 +31,8 @@ npm run dev
 生产构建与预览：
 
 ```bash
-npm run build    # 类型检查（vue-tsc）+ 构建到 dist/
-npm run preview  # 本地预览构建产物
+npm run build       # 先同步图纸库（build:patterns）→ 类型检查（vue-tsc）→ 构建到 dist/
+npm run preview     # 本地预览构建产物
 ```
 
 ## 玩法
@@ -71,7 +71,21 @@ src/
     PatternPicker.vue      # 内置 38 张图纸选择
     CardsView.vue          # 图纸库全屏 iframe（public/pattens/）
     bits/                  # 第三方组件（vue-bits：LineSidebar / OptionWheel，已本地化适配）
+pattern-library/           # 图纸库源项目（原 pokemon-cards-css-main，Svelte 3 静态站，npm workspace）
+scripts/
+  sync-pattens.mjs         # 构建图纸库 → 同步到 public/pattens/（见下）
 ```
+
+## 图纸库（pattern-library/）
+
+内置 38 张图纸来自独立静态站点（Vite + Svelte 3，原 pokemon-cards-css-main），作为 npm workspace 并入本仓库：
+
+- **源项目**在 `pattern-library/`，改图纸库代码就在这改
+- **游戏加载**的是它的构建产物 `public/pattens/`（iframe 直接引用，与源码项目解耦）
+- 修改后运行 `npm run build:patterns`（或直接 `npm run build`）自动重新构建并同步；同步规则：
+  - 合并复制 `dist/*` → `public/pattens/`，保留 pattens 独有文件（favicon.png / thumb.png）
+  - 跳过废弃素材（`.DS_Store`、`img/cosmos-bottom-trans.png`、GeistPixel_Square 字体）与旧版本 `assets/index.*` 入口残留
+  - 自动把 `index.html` 里的 `/assets/` patch 成 `./assets/`（iframe 以子路径加载，绝对路径会 404）
 
 ## 技术栈
 
