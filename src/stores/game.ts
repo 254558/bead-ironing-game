@@ -1,12 +1,15 @@
 import { computed, markRaw, reactive } from 'vue'
-import type { BeadSize, Cell, ImportMode, IronCenter, Mode, MouseState, SavedBoard } from '../types'
-import { CELL, COLORS } from '../utils/color'
+import type { Cell, ImportMode, IronCenter, Mode, MouseState, SavedBoard } from '../types'
+import { CELL, COLORS, DISPLAY_CELL } from '../utils/color'
 import { renderThumb } from '../utils/thumbnail'
 
 const STORAGE_KEY = 'bead-iron.savedBoards'
 
 /** 网格上限（防止极端缩放下内存/遍历失控） */
 export const MAX_GRID = 200
+
+/** 状态提示（toast）显示时长：game 的 status 隐藏与 StatusBar 的 toast life 共用 */
+export const STATUS_DISPLAY_MS = 3500
 
 /** 生成作品缩略图 PNG dataURL（离屏 canvas，当前 renderThumb 规则） */
 function regenerateThumb(grid: Cell[][]): string {
@@ -188,8 +191,6 @@ export const store = reactive({
    *  与 gridVersion 分开：放豆/擦除只改珠子层，不必重建图纸实例 */
   patternVersion: 0,
   mode: 'design' as Mode,
-  /** 豆子规格：大豆 5mm（新手/手摆）／迷你豆 2.6mm（像素精细、更易烫糊） */
-  beadSize: 'big' as BeadSize,
   /** 导入图片的两种方式：图纸（像素参考层，自己放豆）／直接变豆子（自动铺好，只需熨烫） */
   importMode: 'pattern' as ImportMode,
   /** 导入方式选择对话框开关（点「导入」后先问怎么导） */
@@ -234,7 +235,7 @@ export function showStatus(text: string) {
   clearTimeout(statusTimer)
   statusTimer = setTimeout(() => {
     store.statusVisible = false
-  }, 3500)
+  }, STATUS_DISPLAY_MS)
 }
 
 /** 画布上是否已有内容（豆子或导入的图纸像素），有内容时 resize/自动保存不覆盖 */
@@ -266,7 +267,7 @@ export function expandGridKeep(minCols: number, minRows: number) {
  * 这里按默认缩放的可见格数估算，棋盘渲染器随后会按实际可见范围再次扩容。
  */
 export function setupGrid(w: number, h: number) {
-  expandGridKeep(Math.ceil(w / 36), Math.ceil(h / 36))
+  expandGridKeep(Math.ceil(w / DISPLAY_CELL), Math.ceil(h / DISPLAY_CELL))
 }
 
 /** 图片导入时按需扩容画布（调用方随后会覆盖全部格子） */
@@ -289,7 +290,7 @@ const ERASE_HALF_UP = 2
 const ERASE_SIZE = 6
 
 /** 擦除以 (r0, c0) 为基准的 6×6 区域（内容实际变化时递增 gridVersion，供缓存失效） */
-export function eraseArea(r0: number, c0: number) {
+function eraseArea(r0: number, c0: number) {
   const r1 = Math.max(0, r0 - ERASE_HALF_UP)
   const r2 = Math.min(store.rows - 1, r0 - ERASE_HALF_UP + ERASE_SIZE - 1)
   const c1 = Math.max(0, c0 - ERASE_HALF_UP)
@@ -344,13 +345,15 @@ export function eraseCell(r: number, c: number) {
   markDirty()
 }
 
+/** 清空格子全部内容（珠子 + 熔融 + 图纸像素）：清空画布与图片导入共用 */
+export function clearCellContent(cell: Cell) {
+  cell.color = null
+  cell.melt = 0
+  cell.pixel = null
+}
+
 export function clearAll() {
-  for (const row of store.grid)
-    for (const cell of row) {
-      cell.color = null
-      cell.melt = 0
-      cell.pixel = null
-    }
+  for (const row of store.grid) for (const cell of row) clearCellContent(cell)
   store.gridVersion++
   store.patternVersion++ // 图纸层清空，通知画布重建图纸实例
   markDirty()
@@ -388,19 +391,6 @@ export function switchMode(m: Mode) {
 export function selectColor(hex: string) {
   store.selectedColor = hex
   store.isEraser = false
-}
-
-/** 切换豆子规格（5mm / 2.6mm）：几何体与珠体尺寸变化 → gridVersion++ 触发棋盘重建 */
-export function setBeadSize(size: BeadSize) {
-  if (store.beadSize === size) return
-  store.beadSize = size
-  store.gridVersion++
-  markDirty()
-  showStatus(
-    size === 'big'
-      ? '大豆 5mm：新手友好，可手拿摆放'
-      : '迷你豆 2.6mm：像素精细，熨烫更容易糊边',
-  )
 }
 
 export function toggleEraser() {
@@ -473,7 +463,7 @@ export function markDirty() {
 /** 把当前画布写入自动存档（空板不覆盖旧档，保证误触清空后仍能找回）。
  *  稀疏存储：只序列化非空格子（{r,c,color,pixel}），不整表 JSON.stringify——
  *  全空画布 0 条记录，画满也远小于完整 40k 格网格。熔融度不存（恢复时本就清零） */
-export function autosaveNow() {
+function autosaveNow() {
   if (!contentDirty) return
   contentDirty = false
   if (!hasContent()) return

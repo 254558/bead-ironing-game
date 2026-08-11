@@ -1,16 +1,12 @@
 import * as THREE from 'three'
-import type { BeadSize } from '../types'
 
 /**
- * 豆子规格参数（相对格子尺寸归一化，行业实测尺寸，含 ±0.2mm 公差）：
- * - s：珠体相对格子的比例（5mm 大豆填满格子；2.6mm 迷你豆略小、更精细）
- * - hole：中心孔径 / 外径——实测 5mm≈0.5、2.6mm≈0.52，此处略放大（+0.05）让空心更明显
+ * 珠体几何参数（相对格子尺寸归一化，行业实测 5mm 大豆尺寸，含 ±0.2mm 公差）：
+ * - s：珠体相对格子的比例（大豆填满格子）
+ * - hole：中心孔径 / 外径——实测 5mm≈0.5，此处略放大（+0.05）让空心更明显
  * - tol：生产公差 ±0.2mm 相对外径的比例，用于每颗豆的尺寸抖动
  */
-export const BEAD_SCALE: Record<BeadSize, { s: number; hole: number; tol: number }> = {
-  big: { s: 1, hole: 0.55, tol: 0.2 / 5 },
-  mini: { s: 0.88, hole: 0.57, tol: 0.2 / 2.6 },
-}
+export const BEAD_SCALE = { s: 1, hole: 0.55, tol: 0.2 / 5 }
 
 /** 珠体高度系数：无熔融时珠高 = 规格比例 s × 此系数（熔融时按 1−0.92×melt 压扁） */
 export const BEAD_HEIGHT = 2.0
@@ -51,13 +47,13 @@ function splitSideWallGroups(geo: THREE.BufferGeometry, threshold: number): void
 
 /**
  * 空心珠几何体（EVA 空心短圆筒）：圆环拉伸（高细分、圆润边缘），俯视可见贯穿珠孔。
- * 孔径占比随豆子规格变化。拼豆棋盘（three/board.ts）专用，
+ * 拼豆棋盘（three/board.ts）专用。
  */
-export function createHollowBeadGeometry(size: BeadSize = 'big'): THREE.ExtrudeGeometry {
+export function createHollowBeadGeometry(): THREE.ExtrudeGeometry {
   const ringShape = new THREE.Shape()
   ringShape.absarc(0, 0, 1, 0, Math.PI * 2, false)
   const hp = new THREE.Path()
-  hp.absarc(0, 0, BEAD_SCALE[size].hole, 0, Math.PI * 2, true)
+  hp.absarc(0, 0, BEAD_SCALE.hole, 0, Math.PI * 2, true)
   ringShape.holes.push(hp)
   const geo = new THREE.ExtrudeGeometry(ringShape, {
     depth: 0.55,
@@ -68,7 +64,7 @@ export function createHollowBeadGeometry(size: BeadSize = 'big'): THREE.ExtrudeG
   geo.center()
   geo.rotateX(Math.PI / 2)
   // 侧壁拆成外壁/内壁两组材质（外壁清漆反光、内壁哑光）
-  splitSideWallGroups(geo, (1 + BEAD_SCALE[size].hole) / 2)
+  splitSideWallGroups(geo, (1 + BEAD_SCALE.hole) / 2)
   return geo
 }
 
@@ -76,7 +72,7 @@ export function createHollowBeadGeometry(size: BeadSize = 'big'): THREE.ExtrudeG
  * 熔融扁珠几何体：圆角矩形拉伸，中心保留小孔——EVA 熨烫后孔洞不容易完全消失，
  * 只略微收缩（残留孔随 instance 的 y 缩放一起压扁）。
  */
-export function createFilledBeadGeometry(_size: BeadSize = 'big'): THREE.ExtrudeGeometry {
+export function createFilledBeadGeometry(): THREE.ExtrudeGeometry {
   const rw = 0.95
   const rh = 0.95
   const rr = 0.25
@@ -111,7 +107,7 @@ export function createFilledBeadGeometry(_size: BeadSize = 'big'): THREE.Extrude
  * 完全熔融扁珠几何体：圆角矩形拉伸，无孔——熨烫到位（FUSE_MAX）后孔洞完全闭合，
  * 表面不再有凹点。轮廓与 filled 相同，仅去掉残留孔（侧壁单一材质，无需拆组）。
  */
-export function createFusedBeadGeometry(_size: BeadSize = 'big'): THREE.ExtrudeGeometry {
+export function createFusedBeadGeometry(): THREE.ExtrudeGeometry {
   const rw = 0.95
   const rh = 0.95
   const rr = 0.25

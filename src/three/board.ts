@@ -2,8 +2,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { eraseCell, expandGridKeep, getCellAt, MAX_GRID, placeBead, store } from '../stores/game'
-import type { BeadSize } from '../types'
-import { CELL, DISPLAY_CELL, FUSE_MAX, FUSE_SEALED, IRON_RADIUS, beadHash, burnAt } from '../utils/color'
+import { BURN, CELL, DISPLAY_CELL, FUSE_MAX, FUSE_SEALED, IRON_RADIUS, beadHash } from '../utils/color'
 import {
   BEAD_HEIGHT,
   BEAD_SCALE,
@@ -23,10 +22,8 @@ export interface ThreeBoardHandle {
   requestRebuild(): void
   /** 图纸层变化（导入/清空/载入，patternVersion++）→ 下一帧仅重建图纸实例（不重建珠子） */
   requestRebuildPattern(): void
-  /** 同步立即重建珠子与图纸实例（初始渲染 / 豆子规格切换等不能延迟的场景） */
+  /** 同步立即重建珠子与图纸实例（初始渲染等不能延迟的场景） */
   rebuild(): void
-  /** 豆子规格切换（5mm / 2.6mm）→ 重建几何体与实例 */
-  setSize(size: BeadSize): void
   dispose(): void
 }
 
@@ -46,6 +43,8 @@ const PITCH_MIN = (-89.5 * Math.PI) / 180
 const PITCH_MAX = (89.5 * Math.PI) / 180
 /** 设计模式放豆的最低俯仰角：相机低于板面时射线够不到 y=0 地面，点不中格子、WASD 失效 */
 const DESIGN_PITCH_MIN = (3 * Math.PI) / 180
+/** 熔融扁珠起始阈值：低于此值仍为空心珠，达到此值起转为带残留孔的熔融扁珠（FILL_MELT~FUSE_SEALED） */
+const FILL_MELT = 0.35
 
 /**
  * 拼豆棋盘渲染器：three.js 实时光照（EVA 哑光塑料材质），
@@ -135,12 +134,11 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   scene.add(gridLines)
 
   // 珠子几何体与 EVA 材质组（[0]=cap 顶/底面、[1]=外壁清漆、[2]=孔内壁哑光，配合 ExtrudeGeometry groups）
-  let hollowGeo = createHollowBeadGeometry(store.beadSize)
-  let filledGeo = createFilledBeadGeometry(store.beadSize)
-  let fusedGeo = createFusedBeadGeometry(store.beadSize)
+  const hollowGeo = createHollowBeadGeometry()
+  const filledGeo = createFilledBeadGeometry()
+  const fusedGeo = createFusedBeadGeometry()
   const hollowMats = createEvaHollowMaterials()
   const filledMats = createEvaFilledMaterials()
-  let size: BeadSize = store.beadSize
   let hollowMesh: THREE.InstancedMesh | null = null
   let filledMesh: THREE.InstancedMesh | null = null
   let fusedMesh: THREE.InstancedMesh | null = null
@@ -369,7 +367,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   const touchedMeshes = new Set<THREE.InstancedMesh>()
 
   function writeInstance(mesh: THREE.InstancedMesh, idx: number, r: number, c: number, melt: number) {
-    const { s, tol } = BEAD_SCALE[size]
+    const { s, tol } = BEAD_SCALE
     // ±0.2mm 生产公差：按 hash 确定性抖动每颗豆的尺寸，大小略有参差
     const jitter = 1 + (beadHash(r, c) - 0.5) * 2 * tol
     const h = s * jitter * BEAD_HEIGHT * (1 - melt * 0.92)
@@ -387,7 +385,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
       const ax = 0.94 + bh2 * 0.12
       const az = 0.94 + (1 - bh2) * 0.12
       sc.set(rad * ax, h, rad * az)
-      if (melt > burnAt(size)) col.multiplyScalar(0.35)
+      if (melt > BURN) col.multiplyScalar(0.35)
       else if (melt > FUSE_MAX) col.multiplyScalar(0.78)
     } else {
       sc.set(rad, h, rad)
@@ -407,7 +405,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   }
 
   /** 全量重建珠子实例（放豆/擦除/导入/载入/熔融跨形态边界时调用）。
-   *  三形态：未熔融空心珠（<0.35）→ 熔融扁珠带残留孔（0.35~FUSE_SEALED）→ 完全熔融无孔（≥FUSE_SEALED，
+   *  三形态：未熔融空心珠（<FILL_MELT）→ 熔融扁珠带残留孔（FILL_MELT~FUSE_SEALED）→ 完全熔融无孔（≥FUSE_SEALED，
    *  烫到「刚好」容错区间即无孔，直到烫糊前都保持闭合） */
   function buildBeadInstances() {
     const hollow: { r: number; c: number; m: number }[] = []
@@ -417,7 +415,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
       for (let c = 0; c < store.cols; c++) {
         const cell = store.grid[r][c]
         if (!cell.color) continue
-        if (cell.melt < 0.35) hollow.push({ r, c, m: cell.melt })
+        if (cell.melt < FILL_MELT) hollow.push({ r, c, m: cell.melt })
         else if (cell.melt < FUSE_SEALED) filled.push({ r, c, m: cell.melt })
         else fused.push({ r, c, m: cell.melt })
       }
@@ -641,7 +639,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     }
     const b = store.grid[cell.r][cell.c]
     const m = b?.melt ?? 0
-    const s = BEAD_SCALE[size].s
+    const s = BEAD_SCALE.s
     const h = b?.color ? s * BEAD_HEIGHT * (1 - m * 0.92) + 0.1 : 0.08
     const x = cell.c + 0.5
     const y = h
@@ -723,7 +721,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     const r0 = Math.max(0, Math.floor(mz - rad))
     const r1 = Math.min(store.rows - 1, Math.ceil(mz + rad))
     // 有珠子跨过熔融形态边界（hollow ↔ filled ↔ fused）→ 下一帧合并重建
-    const formOf = (m: number) => (m >= FUSE_SEALED ? 2 : m >= 0.35 ? 1 : 0)
+    const formOf = (m: number) => (m >= FUSE_SEALED ? 2 : m >= FILL_MELT ? 1 : 0)
     for (let r = r0; r <= r1; r++)
       for (let c = c0; c <= c1; c++) {
         const cell = store.grid[r][c]
@@ -791,19 +789,6 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
       rebuildPattern()
       markRender()
     })
-  }
-
-  /** 豆子规格切换：几何体（孔径/壁厚）随规格重建，实例整体重建 */
-  function setSize(next: BeadSize) {
-    if (next === size) return
-    size = next
-    hollowGeo.dispose()
-    filledGeo.dispose()
-    fusedGeo.dispose()
-    hollowGeo = createHollowBeadGeometry(size)
-    filledGeo = createFilledBeadGeometry(size)
-    fusedGeo = createFusedBeadGeometry(size)
-    rebuild()
   }
 
   function dispose() {
@@ -882,5 +867,5 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   rebuild()
   animate()
 
-  return { resize, update, requestRebuild, requestRebuildPattern, rebuild, setSize, dispose }
+  return { resize, update, requestRebuild, requestRebuildPattern, rebuild, dispose }
 }

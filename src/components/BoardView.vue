@@ -31,12 +31,6 @@ watch(
   () => board?.requestRebuildPattern(),
 )
 
-// 豆子规格切换（5mm / 2.6mm）→ 重建几何体与实例
-watch(
-  () => store.beadSize,
-  (s) => board?.setSize(s),
-)
-
 // 窗口 resize（Stage.measure → resizeTick）→ 适配视口并扩容网格
 watch(
   () => store.resizeTick,

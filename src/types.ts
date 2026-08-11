@@ -13,9 +13,6 @@ export type Mode = 'design' | 'ironing'
 /** 导入图片的两种方式：图纸（像素参考层，自己放豆）／直接变豆子（自动铺好，只需熨烫） */
 export type ImportMode = 'pattern' | 'beads'
 
-/** 豆子规格：大豆 5mm（外径 5、孔径 ~2.5）／迷你豆 2.6mm（外径 2.6、孔径 ~1.5） */
-export type BeadSize = 'big' | 'mini'
-
 export interface MouseState {
   x: number
   y: number

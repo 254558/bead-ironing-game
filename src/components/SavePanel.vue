@@ -14,7 +14,7 @@ function fmt(t: number) {
 </script>
 
 <template>
-  <div class="save-panel" :class="{ show: store.showSavePanel }" @click.self="setSavePanel(false)">
+  <div class="save-panel" @click.self="setSavePanel(false)">
     <div class="save-panel-inner">
       <header class="save-panel-head">
         <h2 class="save-panel-title">我的作品</h2>

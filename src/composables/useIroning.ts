@@ -19,8 +19,6 @@ export function useIroning(render: () => void) {
     last = ts
 
     if (store.mouse.down && store.mouse.x >= 0 && store.iron.x >= 0) {
-      // 迷你豆壁薄升温快：熔化速度 ×1.2，更容易烫糊
-      const speed = IRON_SPEED * (store.beadSize === 'mini' ? 1.2 : 1)
       // 只遍历熨斗周围的热区窗口（椭圆最大半轴 R*1.25，+1 格余量），避免每帧全表扫描
       const rad = Math.ceil((IRON_RADIUS * 1.25) / CELL) + 1
       const c0 = Math.max(0, Math.floor(store.iron.x / CELL - rad))
@@ -40,7 +38,7 @@ export function useIroning(render: () => void) {
           const d2 = ex * ex + ey * ey
           if (d2 < 1) {
             const f = 1 - Math.sqrt(d2)
-            cell.melt = Math.min(1, cell.melt + speed * f * dt)
+            cell.melt = Math.min(1, cell.melt + IRON_SPEED * f * dt)
             wrote = true
           }
         }

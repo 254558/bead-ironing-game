@@ -1,4 +1,4 @@
-import { expandGrid, markDirty, MAX_GRID, showStatus, store, switchMode } from '../stores/game'
+import { clearCellContent, expandGrid, markDirty, MAX_GRID, showStatus, store, switchMode } from '../stores/game'
 import { COLORS, COLORS_RGB, MAX_PIX } from '../utils/color'
 import type { ImportMode } from '../types'
 
@@ -205,12 +205,7 @@ function importGridBeads(img: HTMLImageElement): boolean {
   }
 
   expandGrid(nx, ny)
-  for (const row of store.grid)
-    for (const cell of row) {
-      cell.color = null
-      cell.melt = 0
-      cell.pixel = null
-    }
+  for (const row of store.grid) for (const cell of row) clearCellContent(cell)
 
   // 相机从近侧俯视棋盘：整图 180° 镜像翻转（与普通识别一致），否则图纸在棋盘上倒置
   const offC = Math.floor((store.cols - nx) / 2)
@@ -284,12 +279,7 @@ export function importImage(file: File, mode: ImportMode) {
 
     expandGrid(pw, ph)
 
-    for (const row of store.grid)
-      for (const cell of row) {
-        cell.color = null
-        cell.melt = 0
-        cell.pixel = null
-      }
+    for (const row of store.grid) for (const cell of row) clearCellContent(cell)
 
     const oc = document.createElement('canvas')
     oc.width = pw

@@ -232,14 +232,10 @@ body {
   position: absolute;
   inset: 0;
   z-index: 8;
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
   background: rgba(8, 10, 14, 0.6);
-}
-
-.save-panel.show {
-  display: flex;
 }
 
 .save-panel-inner {

@@ -1,5 +1,3 @@
-import type { BeadSize } from '../types'
-
 /** 布局与物理常量 */
 export const CELL = 14
 export const DISPLAY_CELL = 36
@@ -8,15 +6,10 @@ export const IRON_RADIUS = 98
 export const FUSE_MAX = 0.7
 /** 孔洞完全闭合的熔融下限：烫到此处起珠子无孔，保持到烫糊前（「刚好」容错区间） */
 export const FUSE_SEALED = 0.5
-/** 豆子烫糊阈值（仅供 burnAt 使用，按豆子规格修正） */
-const BURN = 0.85
+/** 豆子烫糊阈值：烫过此值视为烫糊，珠子整体压暗 */
+export const BURN = 0.85
 export const IRON_SPEED = 1.0
 export const MAX_PIX = 60
-
-/** 豆子烫糊阈值：迷你豆壁薄更易糊边（比 5mm 早 0.05 烫糊） */
-export function burnAt(size: BeadSize): number {
-  return size === 'mini' ? BURN - 0.05 : BURN
-}
 
 /** 调色板（原应用完整颜色表） */
 export const COLORS = [
