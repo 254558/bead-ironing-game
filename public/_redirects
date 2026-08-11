@@ -1,5 +1,2 @@
-# 百度验证文件：阻止 Cloudflare Pages 的 clean-URL 308（/xxx.html → /xxx），保证按原名直接返回
-/baidu_verify_codeva-arKfvqSyK2.html  /baidu_verify_codeva-arKfvqSyK2.html  200
-
 # SPA 回退：未匹配到真实文件的路径返回首页（真实文件优先，不影响 /pattens/ 等静态资源）
 /*  /index.html  200
