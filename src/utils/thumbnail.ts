@@ -26,10 +26,10 @@ export function renderThumb(
       if (c > maxC) maxC = c
     }
   }
-  // 空图案：不绘制任何内容
+  // 空图案：1×1 透明位图（0×0 canvas 的 toDataURL 返回空 "data:,"，<img> 会显示破图图标）
   if (maxR < 0) {
-    ctx.canvas.width = 0
-    ctx.canvas.height = 0
+    ctx.canvas.width = 1
+    ctx.canvas.height = 1
     return
   }
   const cw = maxC - minC + 1

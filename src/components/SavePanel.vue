@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { deleteBoard, loadBoard, setSavePanel, store } from '../stores/game'
+import { deleteBoard, ensureBoardThumbs, loadBoard, setSavePanel, store } from '../stores/game'
+
+// 面板每次挂载（点「保存」/「恢复」打开）时补齐缺失缩略图：
+// 启动时 loadSavedBoards 不生成（避免首帧前同步跑离屏 canvas），旧数据 thumb=null
+ensureBoardThumbs()
 
 /** 保存时间格式：YYYY-MM-DD HH:mm */
 function fmt(t: number) {
@@ -29,7 +33,7 @@ function fmt(t: number) {
           title="点击载入"
           @click="loadBoard(b.id)"
         >
-          <img class="save-thumb" :src="b.thumb" :alt="b.name">
+          <img class="save-thumb" :src="b.thumb ?? undefined" :alt="b.name">
           <div class="save-name">{{ b.name }}</div>
           <div class="save-time">{{ fmt(b.savedAt) }}</div>
           <button class="save-del" title="删除" @click.stop="deleteBoard(b.id)">✕</button>

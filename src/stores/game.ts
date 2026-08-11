@@ -16,24 +16,82 @@ function regenerateThumb(grid: Cell[][]): string {
   return canvas.toDataURL('image/png')
 }
 
-/** 从 localStorage 读取已保存的作品（容错：损坏/不可用时返回空列表，兼容旧冰箱贴数据） */
+/** 作品持久化用稀疏格式：只存非空格子（放豆的格子存 color+melt，未放豆但有图纸参考的存 pixel）。
+ *  缩略图不落盘——载入时统一 regenerateThumb 重新生成，避免每幅几 KB~几十 KB 的冗余 dataURL 占配额 */
+interface SavedBoardStored {
+  id: string
+  name: string
+  cols: number
+  rows: number
+  cells: { r: number; c: number; color?: string; melt?: number; pixel?: string | null }[]
+  savedAt: number
+}
+
+/** 作品 → 稀疏存储格式（内容与 autosave 同源策略：只序列化占用格子，防 5MB 配额爆仓静默丢档） */
+function serializeBoard(b: SavedBoard): SavedBoardStored {
+  const cells: SavedBoardStored['cells'] = []
+  for (let r = 0; r < b.rows; r++) {
+    const row = b.grid[r]
+    if (!row) continue
+    for (let c = 0; c < b.cols; c++) {
+      const cell = row[c]
+      if (!cell) continue
+      // 占用格子即存（color 与 pixel 双图层都保留：豆子铺在图案上时两层都要还原）
+      if (cell.color !== null || cell.pixel !== null) {
+        const s: SavedBoardStored['cells'][number] = { r, c, pixel: cell.pixel }
+        if (cell.color !== null) {
+          s.color = cell.color
+          s.melt = cell.melt
+        }
+        cells.push(s)
+      }
+    }
+  }
+  return { id: b.id, name: b.name, cols: b.cols, rows: b.rows, cells, savedAt: b.savedAt }
+}
+
+/** 稀疏存储格式 → 完整网格作品（兼容旧版全量 grid 数据；grid 用 markRaw 脱离深度代理） */
+function deserializeBoard(d: Partial<SavedBoardStored> & { grid?: Cell[][] }): SavedBoard | null {
+  if (!d || typeof d.cols !== 'number' || typeof d.rows !== 'number' || d.cols <= 0 || d.rows <= 0) return null
+  const grid = createGrid(Math.min(d.cols, MAX_GRID), Math.min(d.rows, MAX_GRID))
+  if (Array.isArray(d.cells)) {
+    for (const s of d.cells) {
+      if (!s || s.r < 0 || s.r >= grid.length || s.c < 0 || !grid[0] || s.c >= grid[0].length) continue
+      grid[s.r][s.c] = { color: s.color ?? null, melt: s.melt ?? 0, pixel: s.pixel ?? null }
+    }
+  } else if (Array.isArray(d.grid)) {
+    // 旧版：全量二维网格
+    for (let r = 0; r < Math.min(grid.length, d.grid.length); r++) {
+      const row = d.grid[r]
+      if (!Array.isArray(row)) continue
+      for (let c = 0; c < Math.min(grid[r].length, row.length); c++) {
+        const s = row[c]
+        if (!s) continue
+        grid[r][c] = { color: s.color ?? null, melt: s.melt ?? 0, pixel: s.pixel ?? null }
+      }
+    }
+  }
+  // 忽略旧的 x/y/rotation/scale 姿态；缩略图不在此生成——改为打开作品列表时统一
+  // ensureBoardThumbs 补齐（旧数据分辨率低，升级避免放大发糊；启动不阻塞首帧）
+  return {
+    id: typeof d.id === 'string' ? d.id : `restored-${Date.now()}`,
+    name: typeof d.name === 'string' ? d.name : '作品',
+    cols: grid[0]!.length,
+    rows: grid.length,
+    grid: markRaw(grid),
+    thumb: null,
+    savedAt: typeof d.savedAt === 'number' ? d.savedAt : 0,
+  }
+}
+
+/** 从 localStorage 读取已保存的作品（容错：损坏/不可用时返回空列表，兼容旧全量数据） */
 function loadSavedBoards(): SavedBoard[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return []
     const list = JSON.parse(raw)
     if (!Array.isArray(list)) return []
-    // 只取核心字段，忽略旧的 x/y/rotation/scale 姿态；
-    // 缩略图统一按当前高清规则重新生成（旧数据分辨率低，升级避免放大发糊）
-    return (list as SavedBoard[]).map((b) => ({
-      id: b.id,
-      name: typeof b.name === 'string' ? b.name : '作品',
-      cols: b.cols,
-      rows: b.rows,
-      grid: b.grid,
-      thumb: regenerateThumb(b.grid),
-      savedAt: typeof b.savedAt === 'number' ? b.savedAt : 0,
-    }))
+    return list.map(deserializeBoard).filter((b): b is SavedBoard => b !== null)
   } catch {
     return []
   }
@@ -41,7 +99,7 @@ function loadSavedBoards(): SavedBoard[] {
 
 function persistBoards() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(store.savedBoards))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(store.savedBoards.map(serializeBoard)))
   } catch {
     /* 存储超限等场景静默失败 */
   }
@@ -126,6 +184,9 @@ export const store = reactive({
   grid: markRaw(autosave?.grid ?? createGrid(30, 30)) as Cell[][],
   /** 网格内容版本号：任何珠子/图纸变更时 +1，供画布静态层缓存失效检测 */
   gridVersion: 0,
+  /** 图纸（pixel 层）版本号：仅导入/清空/载入时 +1。
+   *  与 gridVersion 分开：放豆/擦除只改珠子层，不必重建图纸实例 */
+  patternVersion: 0,
   mode: 'design' as Mode,
   /** 豆子规格：大豆 5mm（新手/手摆）／迷你豆 2.6mm（像素精细、更易烫糊） */
   beadSize: 'big' as BeadSize,
@@ -196,7 +257,7 @@ export function expandGridKeep(minCols: number, minRows: number) {
   store.cols = nc
   store.rows = nr
   store.gridVersion++ // 网格线数量变化，静态层缓存失效
-  markDirty()
+  // 内容未变：不 markDirty（纯扩容不触发 autosave，恢复时按可见范围再扩即可）
 }
 
 /**
@@ -257,7 +318,15 @@ export function placeBead(x: number, y: number) {
     return
   }
   const target = store.grid[cell.r][cell.c]
-  if (target.color === store.selectedColor) return
+  if (target.color === store.selectedColor) {
+    // 同色豆被烫过（melt>0）：放豆重置熔融——让「放豆」能修复烫糊的珠子
+    if (target.melt !== 0) {
+      target.melt = 0
+      store.gridVersion++
+      markDirty()
+    }
+    return
+  }
   target.color = store.selectedColor
   target.melt = 0
   store.gridVersion++
@@ -283,6 +352,7 @@ export function clearAll() {
       cell.pixel = null
     }
   store.gridVersion++
+  store.patternVersion++ // 图纸层清空，通知画布重建图纸实例
   markDirty()
   switchMode('design')
 }
@@ -366,6 +436,7 @@ export function loadBoard(id: string) {
   store.rows = board.rows
   store.grid = markRaw(board.grid.map((row) => row.map((cell) => ({ ...cell }))))
   store.gridVersion++
+  store.patternVersion++ // 图纸层整体替换，通知画布重建图纸实例
   markDirty()
   store.mode = 'design' // 直接赋值：避免 switchMode 清零 melt
   store.showSavePanel = false
@@ -379,6 +450,12 @@ export function deleteBoard(id: string) {
 
 export function setSavePanel(show: boolean) {
   store.showSavePanel = show
+}
+
+/** 补齐缺失的作品缩略图（作品列表打开时调用）：启动时 loadSavedBoards 不生成，
+ *  首次展示列表才一次性按当前高清规则生成，避免首帧前同步跑离屏 canvas */
+export function ensureBoardThumbs() {
+  for (const b of store.savedBoards) if (b.thumb === null) b.thumb = regenerateThumb(b.grid)
 }
 
 /* ---------- 自动保存（每 5 秒 + 关页面前，防止误触/刷新丢豆子） ---------- */

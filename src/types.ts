@@ -36,7 +36,7 @@ export interface SavedBoard {
   cols: number
   rows: number
   grid: Cell[][]
-  /** 缩略图 PNG dataURL */
-  thumb: string
+  /** 缩略图 PNG dataURL（null = 尚未生成，作品列表打开时 ensureBoardThumbs 补齐） */
+  thumb: string | null
   savedAt: number
 }

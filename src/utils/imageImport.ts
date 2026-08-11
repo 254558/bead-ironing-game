@@ -252,6 +252,7 @@ function importGridBeads(img: HTMLImageElement): boolean {
 
   switchMode('ironing')
   store.gridVersion++ // 图纸写入完成，通知画布静态层缓存失效
+  store.patternVersion++ // 图纸层重写，通知画布重建图纸实例
   markDirty()
   showStatus(`已从图纸生成 ${nx}×${ny} 豆子，按住拖动熨烫`)
   return true
@@ -317,6 +318,7 @@ export function importImage(file: File, mode: ImportMode) {
 
     switchMode(mode === 'beads' ? 'ironing' : 'design')
     store.gridVersion++ // 图纸写入完成，通知画布静态层缓存失效
+    store.patternVersion++ // 图纸层重写，通知画布重建图纸实例
     markDirty()
     showStatus(
       mode === 'beads'

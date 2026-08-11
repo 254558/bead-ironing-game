@@ -18,11 +18,17 @@ watch(
   },
 )
 
-// 网格内容变化（放豆/擦除/导入/清空/载入/熔融复位）→ 下一帧合并重建珠子与图纸实例。
+// 网格内容变化（放豆/擦除/导入/清空/载入/熔融复位）→ 下一帧合并重建珠子实例。
 // 拖拽连续放豆时每个 pointermove 都递增 gridVersion，requestRebuild 按帧去重，避免每 move 全量重建
 watch(
   () => store.gridVersion,
   () => board?.requestRebuild(),
+)
+
+// 图纸层变化（导入/清空/载入）→ 仅重建图纸实例，不动珠子层
+watch(
+  () => store.patternVersion,
+  () => board?.requestRebuildPattern(),
 )
 
 // 豆子规格切换（5mm / 2.6mm）→ 重建几何体与实例
@@ -39,8 +45,9 @@ watch(
 
 onMounted(() => {
   if (wrap.value) {
+    // createThreeBoard 内部已做初始 resize + rebuild（autosave 恢复的作品也一并渲染），
+    // 此处不再二次 rebuild；后续 resizeTick/gridVersion/patternVersion 变化由上方 watch 接管
     board = createThreeBoard(wrap.value)
-    board.rebuild() // 初始渲染：autosave 恢复的作品不依赖 resize 扩容也能立即显示
   }
 })
 

@@ -19,8 +19,10 @@ export interface ThreeBoardHandle {
   resize(): void
   /** 熨烫动画帧：局部更新鼠标周围珠子的熔融形态 */
   update(): void
-  /** 网格内容变化（放豆/导入/清空/载入）→ 下一帧合并重建珠子与图纸实例（rAF 去重，拖拽连发时每帧至多一次） */
+  /** 珠子层变化（放豆/擦除/熔融跨形态边界）→ 下一帧合并重建珠子实例（rAF 去重，拖拽连发时每帧至多一次） */
   requestRebuild(): void
+  /** 图纸层变化（导入/清空/载入，patternVersion++）→ 下一帧仅重建图纸实例（不重建珠子） */
+  requestRebuildPattern(): void
   /** 同步立即重建珠子与图纸实例（初始渲染 / 豆子规格切换等不能延迟的场景） */
   rebuild(): void
   /** 豆子规格切换（5mm / 2.6mm）→ 重建几何体与实例 */
@@ -207,8 +209,9 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     if (fwd === 0 && strafe === 0) return
     e.preventDefault()
     const { w } = viewportSize()
-    const pr = groundPoint(1, 0)!
-    const pl = groundPoint(-1, 0)!
+    // 同时需要左右缘两个结果：分别用 _gpOut / _gpOut2，避免共享缓冲互相覆盖
+    const pr = groundPoint(1, 0, _gpOut)!
+    const pl = groundPoint(-1, 0, _gpOut2)!
     // 屏幕左右缘的地面距离 ÷ 屏宽 = 每像素地面步长；注意相机朝向不同时该差值为负，取绝对值。
     // 每按移动 36px（默认缩放下恰好一格），按住时系统自动连发
     const step = Math.max(1e-6, Math.abs(pr.x - pl.x) / w) * 36
@@ -233,6 +236,17 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     return { w: Math.max(1, container.clientWidth), h: Math.max(1, container.clientHeight) }
   }
 
+  // 画布 rect 缓存：getBoundingClientRect 会强制同步布局，而 pointermove 挂在 window 上高频触发，
+  // 每帧读一次等于每帧强制布局。改为缓存 + 失效：仅窗口 resize / 容器尺寸变化（ResizeObserver）时
+  // 刷新；页面 body overflow:hidden 不滚动，缓存不会因滚动失效
+  let canvasRect: DOMRect | null = null
+  function cachedRect(): DOMRect {
+    return canvasRect ?? (canvasRect = renderer.domElement.getBoundingClientRect())
+  }
+  function invalidateRect() {
+    canvasRect = null
+  }
+
   /** 标定 scale=1 时相机到注视点的距离，使每格显示 DISPLAY_CELL 像素 */
   function computeBaseDist(vh: number): number {
     const T = (TILT_DEG * Math.PI) / 180
@@ -242,32 +256,41 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     return H / Math.sin(T)
   }
 
+  // groundPoint 的 scratch 向量（与 writeInstance 共用 scratch 的模式一致）：pointermove 每帧
+  // 多次射线求交，逐次新建 Vector3 会产生高频 GC。返回的 out（默认 _gpOut）是内部复用的缓冲，
+  // 调用方必须在下一次 groundPoint 前消费完；需同时持有两个结果时（onKeyDown 的屏幕左右缘）用
+  // _gpOut2 作为第二输出参数
+  const _gpDir = new THREE.Vector3()
+  const _gpOut = new THREE.Vector3()
+  const _gpOut2 = new THREE.Vector3()
+
   /** 屏幕 NDC → 地面世界点（射线与 y=0 平面求交，精确） */
-  function groundPoint(nx: number, ny: number): THREE.Vector3 | null {
+  function groundPoint(nx: number, ny: number, out: THREE.Vector3 = _gpOut): THREE.Vector3 | null {
     camera.updateMatrixWorld()
-    const v = new THREE.Vector3(nx, ny, 0.5).unproject(camera)
-    const dir = v.sub(camera.position).normalize()
-    if (dir.y >= -1e-4) return null
-    const t = -camera.position.y / dir.y
-    return camera.position.clone().addScaledVector(dir, t)
+    _gpDir.set(nx, ny, 0.5).unproject(camera).sub(camera.position).normalize()
+    if (_gpDir.y >= -1e-4) return null
+    const t = -camera.position.y / _gpDir.y
+    return out.set(camera.position.x + _gpDir.x * t, 0, camera.position.z + _gpDir.z * t)
   }
 
-  function groundFromClient(cx: number, cy: number): THREE.Vector3 | null {
-    const rect = renderer.domElement.getBoundingClientRect()
+  function groundFromClient(cx: number, cy: number, out: THREE.Vector3 = _gpOut): THREE.Vector3 | null {
+    const rect = cachedRect()
     const nx = ((cx - rect.left) / rect.width) * 2 - 1
     const ny = -(((cy - rect.top) / rect.height) * 2 - 1)
-    return groundPoint(nx, ny)
+    return groundPoint(nx, ny, out)
   }
 
   /** 熨斗游标（clawd-dizzy.svg）：img translate(-50%,-50%) 使图标中心始终位于鼠标点，
-   *  熨烫面积以图标中心（即鼠标点正下方）为圆心，无需额外偏移 */
-  function positionIron(cx: number, cy: number) {
-    const rect = renderer.domElement.getBoundingClientRect()
+   *  熨烫面积以图标中心（即鼠标点正下方）为圆心，无需额外偏移。
+   *  返回鼠标点的地面交点（_gpOut 缓冲），供调用方直接消费，避免同一事件重复射线求交 */
+  function positionIron(cx: number, cy: number): THREE.Vector3 | null {
+    const rect = cachedRect()
     ironImg.style.left = `${cx - rect.left}px`
     ironImg.style.top = `${cy - rect.top}px`
     const p = groundFromClient(cx, cy)
     store.iron.x = p ? p.x * CELL : -1
     store.iron.y = p ? p.z * CELL : -1
+    return p
   }
 
   /** 按当前相机可见范围扩容网格（只增不减、保留内容），保证视口内有格子 */
@@ -374,6 +397,15 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     mesh.setColorAt(idx, col)
   }
 
+  /** 移除并释放 InstancedMesh 的实例缓冲（instanceMatrix/instanceColor 是 InstancedBufferAttribute，
+   *  每 mesh 独占、可安全 dispose）。拖拽放豆/擦除时按帧重建 mesh，不释放会累积 GPU 内存 */
+  function disposeInstancedMesh(mesh: THREE.InstancedMesh | null) {
+    if (!mesh) return
+    scene.remove(mesh)
+    mesh.instanceMatrix?.dispose()
+    mesh.instanceColor?.dispose()
+  }
+
   /** 全量重建珠子实例（放豆/擦除/导入/载入/熔融跨形态边界时调用）。
    *  三形态：未熔融空心珠（<0.35）→ 熔融扁珠带残留孔（0.35~FUSE_SEALED）→ 完全熔融无孔（≥FUSE_SEALED，
    *  烫到「刚好」容错区间即无孔，直到烫糊前都保持闭合） */
@@ -390,9 +422,10 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
         else fused.push({ r, c, m: cell.melt })
       }
 
-    if (hollowMesh) scene.remove(hollowMesh)
-    if (filledMesh) scene.remove(filledMesh)
-    if (fusedMesh) scene.remove(fusedMesh)
+    disposeInstancedMesh(hollowMesh)
+    disposeInstancedMesh(filledMesh)
+    disposeInstancedMesh(fusedMesh)
+    // 显式置空：某形态本轮数量为 0 时不新建 mesh，变量必须脱离对已释放旧 mesh 的引用
     hollowMesh = null
     filledMesh = null
     fusedMesh = null
@@ -447,7 +480,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
         const px = store.grid[r][c].pixel
         if (px) cells.push({ r, c, px })
       }
-    if (patternMesh) scene.remove(patternMesh)
+    disposeInstancedMesh(patternMesh)
     patternMesh = null
     if (cells.length === 0) return
     patternMesh = new THREE.InstancedMesh(patternGeo, patternMat, cells.length)
@@ -478,8 +511,8 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
 
   function onPointerDown(e: PointerEvent) {
     if (e.button === 2) return
-    positionIron(e.clientX, e.clientY)
-    const p = groundFromClient(e.clientX, e.clientY)
+    // positionIron 已算出地面交点，直接复用（避免同一事件重复射线求交）
+    const p = positionIron(e.clientX, e.clientY)
     if (p) {
       store.mouse.x = p.x * CELL
       store.mouse.y = p.z * CELL
@@ -498,7 +531,25 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   }
 
   function onPointerMove(e: PointerEvent) {
-    positionIron(e.clientX, e.clientY)
+    // 命中过滤：pointermove 挂在 window 上，指针落在 UI 覆盖层（透明侧栏/对话框/作品列表）时
+    // 直接跳过，不做射线与样式计算。画布铺满全窗口（覆盖层悬浮其上），不能用 rect 范围判断，
+    // 用 elementFromPoint 取该点顶层元素：不是画布容器内的元素即为覆盖层；
+    // 拖拽中指针移出画布仍需继续（跨边界连续放豆/熨烫），不裁剪
+    const hit = document.elementFromPoint(e.clientX, e.clientY)
+    if ((!hit || !container.contains(hit)) && !store.mouse.down) {
+      // 清掉上一格的悬停框/熨斗游标残留，避免指针移到覆盖层上时高亮停在原地
+      if (store.mouse.x >= 0 || hoverBox.visible) {
+        store.mouse.x = -1
+        store.mouse.y = -1
+        store.iron.x = -1
+        store.iron.y = -1
+        hoverBox.visible = false
+        markRender()
+      }
+      return
+    }
+    // positionIron 已算出地面交点，直接复用（避免同一事件重复射线求交）
+    const p = positionIron(e.clientX, e.clientY)
     if (rotDrag) {
       // 视角拖拽（棋盘跟随鼠标的直觉方向）：水平右拖绕 Y 轴右转，向下拖视角变高更俯视
       yaw = rotDrag.yaw0 + (e.clientX - rotDrag.sx) * ROT_SPEED
@@ -510,7 +561,6 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
       ensureGridFitsViewport()
       return
     }
-    const p = groundFromClient(e.clientX, e.clientY)
     if (!p) return
     store.mouse.x = p.x * CELL
     store.mouse.y = p.z * CELL
@@ -650,6 +700,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   /* ---------- 对外接口 ---------- */
 
   function resize() {
+    invalidateRect() // 画布尺寸变化 → 缓存的 rect 失效，下次指针事件重新读取
     const { w, h } = viewportSize()
     camera.aspect = w / h
     camera.updateProjectionMatrix()
@@ -711,15 +762,33 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   let rebuildPending = false
   let rebuildRaf = 0
 
-  /** 内容变化 → 下一帧合并重建（同一帧内多次触发只重建一次）。
-   *  拖拽放豆/6×6 擦除每个 pointermove 都可能触发 gridVersion++，同步全量重建会反复
-   *  扫描整表 + 新建 InstancedMesh；延迟一帧后肉眼不可见，重建次数从“每 move”降到“每帧一次” */
+  /** 珠子层内容变化（放豆/擦除/熔融跨形态边界）→ 下一帧合并重建珠子实例（不重建图纸层：
+   *  放豆/擦除不会改变 pixel 层，图纸实例无需动）。
+   *  同一帧内多次触发只重建一次：拖拽放豆/6×6 擦除每个 pointermove 都可能触发 gridVersion++，
+   *  同步全量重建会反复扫描整表 + 新建 InstancedMesh；延迟一帧后肉眼不可见，
+   *  重建次数从“每 move”降到“每帧一次” */
   function requestRebuild() {
     if (rebuildPending) return
     rebuildPending = true
     rebuildRaf = requestAnimationFrame(() => {
       rebuildPending = false
-      rebuild()
+      buildBeadInstances()
+      markRender()
+    })
+  }
+
+  let rebuildPatternPending = false
+  let rebuildPatternRaf = 0
+
+  /** 图纸层变化（导入/清空/载入，patternVersion++）→ 下一帧仅重建图纸实例。
+   *  与 requestRebuild 分开：放豆/擦除只改珠子层，不必重建图纸层 */
+  function requestRebuildPattern() {
+    if (rebuildPatternPending) return
+    rebuildPatternPending = true
+    rebuildPatternRaf = requestAnimationFrame(() => {
+      rebuildPatternPending = false
+      rebuildPattern()
+      markRender()
     })
   }
 
@@ -739,8 +808,33 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   function dispose() {
     cancelAnimationFrame(raf)
     cancelAnimationFrame(rebuildRaf)
+    cancelAnimationFrame(rebuildPatternRaf)
     rebuildPending = false
+    rebuildPatternPending = false
     controls.dispose()
+    // 释放实例缓冲与场景内全部几何/材质：renderer.dispose 只释放渲染器级资源，
+    // 对象级 GPU 缓冲（instanceMatrix 等）必须逐个 dispose，否则热重载/反复进出会累积
+    disposeInstancedMesh(hollowMesh)
+    disposeInstancedMesh(filledMesh)
+    disposeInstancedMesh(fusedMesh)
+    disposeInstancedMesh(patternMesh)
+    hollowMesh = null
+    filledMesh = null
+    fusedMesh = null
+    patternMesh = null
+    // 材质统一是单 Material（构造时直接传入），按窄类型释放
+    const hoverMat = hoverBox.material as THREE.Material
+    const groundMat = ground.material as THREE.Material
+    const gridMat = gridLines.material as THREE.Material
+    hoverBox.geometry.dispose()
+    hoverMat.dispose()
+    ground.geometry.dispose()
+    groundMat.dispose()
+    gridMat.dispose()
+    patternMat.dispose()
+    pmrem.dispose()
+    scene.environment?.dispose()
+    scene.environment = null
     renderer.dispose()
     renderer.domElement.remove()
     ironImg.remove()
@@ -761,11 +855,16 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     container.removeEventListener('pointerleave', onLeave)
     el.removeEventListener('wheel', onWheel)
     el.removeEventListener('contextmenu', onContext)
+    rectObserver.disconnect()
   }
 
   /* ---------- 初始化 ---------- */
 
   const el = renderer.domElement
+  // 容器尺寸变化（窗口 resize / 布局调整）→ rect 缓存失效；不 observe renderer.domElement，
+  // 它由 CSS 撑满容器，尺寸只随容器变化
+  const rectObserver = new ResizeObserver(invalidateRect)
+  rectObserver.observe(container)
   el.addEventListener('pointerdown', onPointerDown)
   window.addEventListener('pointermove', onPointerMove)
   window.addEventListener('pointerup', onPointerUp)
@@ -782,5 +881,5 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   rebuild()
   animate()
 
-  return { resize, update, requestRebuild, rebuild, setSize, dispose }
+  return { resize, update, requestRebuild, requestRebuildPattern, rebuild, setSize, dispose }
 }
