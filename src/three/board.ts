@@ -63,16 +63,13 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   scene.fog = fog
 
   const camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 600)
-  // 移动端（<768px）GPU 较弱：关抗锯齿/阴影、pixelRatio 上限降到 1——画质略软但帧率更稳。
-  // 断点与布局一致（style.css @media max-width: 767px）
-  const isMobile = window.matchMedia('(max-width: 767px)').matches
-  const renderer = new THREE.WebGLRenderer({ antialias: !isMobile, alpha: true })
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
   // pixelRatio 上限 1.5：retina 下帧缓冲像素减少约 44%，画面略软但高帧率更稳
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? 1 : 1.5))
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5))
   // Neutral tone mapping：相比 ACES 不压缩高饱和色，拼豆颜色更浓郁
   renderer.toneMapping = THREE.NeutralToneMapping
   renderer.toneMappingExposure = 1.0
-  renderer.shadowMap.enabled = !isMobile
+  renderer.shadowMap.enabled = true
   renderer.shadowMap.type = THREE.PCFSoftShadowMap
   container.appendChild(renderer.domElement)
 
