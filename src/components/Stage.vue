@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, useTemplateRef } from 'vue'
+import { defineAsyncComponent, onMounted, onUnmounted, useTemplateRef } from 'vue'
 import { setupGrid, showStatus, startAutosave, stopAutosave, store } from '../stores/game'
 import BoardView from './BoardView.vue'
-import SavePanel from './SavePanel.vue'
 import StatusBar from './StatusBar.vue'
+
+// 作品面板：点开才下载，减小首屏 JS
+const SavePanel = defineAsyncComponent(() => import('./SavePanel.vue'))
 
 const root = useTemplateRef<HTMLDivElement>('root')
 let resizeTimer: ReturnType<typeof setTimeout> | undefined
@@ -38,7 +40,7 @@ onUnmounted(() => {
 <template>
   <div ref="root" class="canvas-wrap">
     <BoardView />
-    <SavePanel />
+    <SavePanel v-if="store.showSavePanel" />
     <StatusBar />
   </div>
 </template>

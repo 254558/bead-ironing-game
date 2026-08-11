@@ -1,4 +1,7 @@
 User-agent: *
 Allow: /
 
+# 图纸库子页面（游戏 iframe 内使用）：不收录，节省抓取预算
+Disallow: /pattens/
+
 Sitemap: https://pindou520.fun/sitemap.xml

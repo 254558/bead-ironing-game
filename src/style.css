@@ -51,6 +51,19 @@ body {
   justify-content: space-between;
 }
 
+/* 视觉隐藏（用于 SEO/无障碍的页面标题等）：保留给读屏/爬虫，不占布局 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* ---------- 侧栏 ---------- */
 .sidebar {
   background: transparent;

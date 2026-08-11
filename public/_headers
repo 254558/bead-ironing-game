@@ -1,0 +1,21 @@
+# Cloudflare Pages 响应头配置（规则按匹配合并，同名头以更具体的规则为准）
+
+# 图纸库子页面：禁止收录（配合 robots.txt Disallow /pattens/ 与页内 noindex）
+/pattens/*
+  X-Robots-Tag: noindex, nofollow
+
+# 内容哈希资源：一年强缓存（文件名含 hash，可安全 immutable）
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+/pattens/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+/*.webp
+  Cache-Control: public, max-age=31536000, immutable
+/*.woff2
+  Cache-Control: public, max-age=31536000, immutable
+
+# HTML：不缓存，发布后立即生效
+/*.html
+  Cache-Control: no-cache
+/
+  Cache-Control: no-cache
