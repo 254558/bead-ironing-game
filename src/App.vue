@@ -2,6 +2,7 @@
 import { defineAsyncComponent } from 'vue'
 import CardsView from './components/CardsView.vue'
 import ColorWheelPanel from './components/ColorWheelPanel.vue'
+import MobileChrome from './components/MobileChrome.vue'
 import Stage from './components/Stage.vue'
 import ToolPanel from './components/ToolPanel.vue'
 import { store } from './stores/game'
@@ -19,6 +20,8 @@ const PatternPicker = defineAsyncComponent(() => import('./components/PatternPic
       <ToolPanel />
     </aside>
     <Stage />
+    <!-- 手机端浮层：顶部工具栏 + 底部调色板（<768px 显示，桌面端 CSS 隐藏） -->
+    <MobileChrome />
     <aside class="sidebar sidebar-right">
       <ColorWheelPanel />
     </aside>
