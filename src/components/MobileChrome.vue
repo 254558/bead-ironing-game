@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, watch } from 'vue'
-import { selectColor, store, toggleEraser } from '../stores/game'
+import { computed, nextTick, onMounted, watch } from 'vue'
+import { selectColor, showStatus, store, toggleEraser } from '../stores/game'
 import { COLORS } from '../utils/color'
 import { handleToolAction, TOOLS, toolActiveIndex } from '../utils/tools'
 
@@ -27,6 +27,15 @@ watch(selected, async (idx) => {
     block: 'nearest',
     behavior: 'smooth',
   })
+})
+
+onMounted(() => {
+  // 手机没有右键/键盘：单指点按放豆、双指拖动平移、双指捏合缩放、长按擦除。
+  // 首次进站提示一次手势（同一标签页会话只弹一次，不打扰）
+  if (window.matchMedia('(max-width: 767px)').matches && !sessionStorage.getItem('bead-iron.gesture-hint')) {
+    sessionStorage.setItem('bead-iron.gesture-hint', '1')
+    showStatus('手势：单指点按放豆 · 双指拖动平移 · 双指捏合缩放 · 长按擦除')
+  }
 })
 </script>
 
