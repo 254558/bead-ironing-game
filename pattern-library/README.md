@@ -1,54 +1,63 @@
-# Pokémon Cards Holographic effect in CSS
+# pattern-library · 图纸库
 
-This is a repository holder for the Pokemon Cards CSS Holographic effect.  
+宝可梦卡牌全息效果参考页（Vite + Svelte 3），作为 npm workspace 并入 **bead-ironing** 游戏仓库，为游戏提供「内置图纸」。
 
-| <img src="https://github.com/user-attachments/assets/ca493541-57bb-48c3-b40c-925f7203a933" width=80> | As seen on [css-tricks.com](https://css-tricks.com/holographic-trading-card-effect/) and [codepen](https://codepen.io/simeydotme/pen/abYWJdX) 
-| --: | :-- |
-| [<img src="https://github.com/user-attachments/assets/fd862cc7-2f30-4a35-9dbc-778edcc369f3" width=80>](https://poke-holo.simey.me/) | Demo running @ https://poke-holo.simey.me/   |
-| [<img src="https://github.com/user-attachments/assets/f1c9d376-0948-4b96-826e-f016e6584736" width=80><img src="https://github.com/user-attachments/assets/8137f0c8-6bc2-4f22-90c9-03cb8332b6f1" width=25>](https://poke-151.simey.me/) | 151 version @ https://poke-151.simey.me/ ⭐ |
+代码源自上游开源项目 [simeydotme/pokemon-cards-css](https://github.com/simeydotme/pokemon-cards-css)（Holographic Trading Card Effect）。并入后按游戏需求删减了废弃素材，并新增 `public/patterns/` 下的 38 张拼豆图纸。
 
-<br><br>
+## 与游戏的关系
 
------
+游戏**不直接引用本目录**，加载的是同步后的静态产物 `public/pattens/`（游戏根目录下，iframe 直接引用）：
 
-> [!TIP]
-> I've published a component which can help with getting you a similar effect to this, without much effort;  
-> https://github.com/simeydotme/hover-tilt 
+```
+pattern-library/            （源码：改图纸、改卡面样式在这改）
+    ↓ npm run build → dist/
+    ↓ 根脚本 scripts/sync-pattens.mjs 同步
+public/pattens/             （产物：游戏运行时加载的成品）
+```
 
----
+同步时脚本自动：
 
-### A collection of advanced CSS styles, applied with SvelteJS.
-Uses CSS Transforms, Gradients, Blend-modes and Filters to simulate the various Holofoil effects found
-in the Sword and Shield era of Pokemon Trading Cards.
+- 合并复制 `dist/*` → `public/pattens/`，保留 pattens 独有文件（favicon / thumb）
+- 跳过 `.DS_Store`，自动清理旧版本 `assets/index.*` 入口残留
+- 把 `index.html` 里的 `/assets/` patch 成 `./assets/`（iframe 以子路径加载，绝对路径会 404）
 
-<img src="public/pokemon-cards-demo.gif" />
+## 常用命令
 
+依赖由仓库根目录 workspace 统一安装（在根目录 `npm install` 即可）。在 `pattern-library/` 内：
 
+| 命令 | 作用 |
+| --- | --- |
+| `npm run dev` | 独立运行参考页（http://localhost:5173） |
+| `npm run build` | 构建到 `dist/`（产物会被根同步脚本复制到游戏） |
+| `npm run preview` | 本地预览构建产物 |
 
----
+> 平时**不需要**单独跑 build —— 根目录 `npm run build` 或 `npm run build:patterns` 会自动构建本目录并同步到 `public/pattens/`。
 
-> [!NOTE]
-> Please [read `#issues/19` before asking / requesting any help](https://github.com/simeydotme/pokemon-cards-css/issues/19) or advice on the Project.  
-Thank you.
+## 新增图纸
 
+见根目录 README 的「新增一张图纸」章节，完整步骤：
 
----
+1. 放图纸 → `public/patterns/p39.webp`（两位补零编号，1024×1024、40×40 网格）
+2. `src/App.svelte` 末尾追加 `<Card id="pattern-39" …>`
+3. 游戏 `src/components/PatternPicker.vue` 的 PATTERNS 数组加名字
+4. 根目录跑 `npm run build:patterns` 同步
+5. 更新游戏 UI 里写死的「内置 38 张图纸选」计数（ImportDialog.vue / PatternPicker.vue）
+6. `npm run dev` 验证
 
-#### support / tip  
-If you think this is super cool, or useful, and want to donate a little, then you are also super cool!
+## 关键文件
 
-|  |  |         |
-|--|--:|---------|
-| <img src="https://user-images.githubusercontent.com/2817396/149629283-6002944f-9253-4e35-917d-89b476deae4e.png" width=20> | [![£1 One Pound tip](https://user-images.githubusercontent.com/2817396/149629980-08b9a952-bd6a-4c23-be78-05e3fd534352.png)](https://www.paypal.com/paypalme/simey/1) | [£1 tip](https://www.paypal.com/paypalme/simey/1) |
-| <img src="https://user-images.githubusercontent.com/2817396/149629283-6002944f-9253-4e35-917d-89b476deae4e.png" width=20> | [![£5 Five Pounds tip](https://user-images.githubusercontent.com/2817396/149629994-3a99770c-d333-46e7-9818-ab6b18ad0202.png)](https://www.paypal.com/paypalme/simey/5) | [£5 tip](https://www.paypal.com/paypalme/simey/5) |
-| <img src="https://user-images.githubusercontent.com/2817396/149629283-6002944f-9253-4e35-917d-89b476deae4e.png" width=20> | [![£10 Ten Pounds tip](https://user-images.githubusercontent.com/2817396/149630000-95aa4234-ff67-4e7c-a7f4-ffd52f25e6d8.png)](https://www.paypal.com/paypalme/simey/10) | [£10 tip](https://www.paypal.com/paypalme/simey/10) |
+| 文件 | 说明 |
+| --- | --- |
+| `index.html` | 参考页入口（游戏 iframe 的 `src`） |
+| `src/App.svelte` | 卡片列表，每张图纸一条 `<Card>` |
+| `src/lib/components/Card.svelte` / `CardProxy.svelte` | 卡片组件（全息效果） |
+| `public/patterns/p01~p38.webp` | 图纸图片（1024×1024、40×40 标准网格） |
+| `public/css/cards/*.css` | 各种卡面全息样式（彩虹、闪卡、VMAX 等） |
+| `src/lib/components/alternate-arts.json` / `promos.json` | 卡面元数据（换图、异画） |
 
+## 上游与许可
 
+全息卡面效果来自 [simeydotme/pokemon-cards-css](https://github.com/simeydotme/pokemon-cards-css)，在线演示见 [poke-holo.simey.me](https://poke-holo.simey.me/)；本目录保留上游 `LICENSE`（MIT）。
 
-
-
----
-#### attribution
-
-<sub>- Galaxy Holo from [aschefield101](https://www.deviantart.com/aschefield101/art/HoloSheet-2012-313543843)</sub>  
-<sub>- Some backgrounds from [Vecteezy](https://www.vecteezy.com/free-photos)</sub>
+- Galaxy Holo 素材来自 [aschefield101](https://www.deviantart.com/aschefield101/art/HoloSheet-2012-313543843)
+- 部分背景来自 [Vecteezy](https://www.vecteezy.com/free-photos)
