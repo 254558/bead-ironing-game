@@ -134,8 +134,55 @@ scripts/
 - **游戏加载**的是它的构建产物 `public/pattens/`（iframe 直接引用，与源码项目解耦）
 - 修改后运行 `npm run build:patterns`（或直接 `npm run build`）自动重新构建并同步；同步规则：
   - 合并复制 `dist/*` → `public/pattens/`，保留 pattens 独有文件（favicon.png / thumb.png）
-  - 跳过废弃素材（`.DS_Store`、`img/cosmos-bottom-trans.png`、GeistPixel_Square 字体）与旧版本 `assets/index.*` 入口残留
+  - 跳过 `.DS_Store`，并自动清理旧版本 `assets/index.*` 入口残留
   - 自动把 `index.html` 里的 `/assets/` patch 成 `./assets/`（iframe 以子路径加载，绝对路径会 404）
+
+### 新增一张图纸（以第 39 张为例）
+
+图纸要求：**1024×1024、40×40 标准网格的 webp**（游戏自动识别网格精确 1:1 铺豆；其他尺寸也能导入，但不保证还原）。
+
+**① 放图纸文件**
+
+```text
+pattern-library/public/patterns/p39.webp   ← 编号两位数字补零（p01…p38、p39…p99）
+```
+
+**② 参考页加卡**（`pattern-library/src/App.svelte`，在最后一张 `<Card>` 后追加）
+
+```svelte
+<Card
+  id="pattern-39"
+  name="新图纸 (p39)"
+  types="pattern"
+  img="./patterns/p39.webp"
+  number="39"
+  rarity="任意稀有度文字"
+  supertype="Pokémon"
+  subtypes="Basic"
+/>
+```
+
+**③ 游戏内选择器加名字**（`src/components/PatternPicker.vue`，PATTERNS 数组末尾追加；路径自动映射成 `pattens/patterns/p39.webp`）
+
+```js
+const PATTERNS = [
+  // ... 现有 38 个名字
+  'Amazing Rare',
+  '新图纸名字',   // ← 第 39 个
+]
+```
+
+> 第 ② 步只影响参考页展示；第 ③ 步名字不写，游戏里就选不到这张图。
+
+**④ 同步**
+
+```bash
+npm run build:patterns
+```
+
+**⑤ 更新 UI 计数**：`src/components/ImportDialog.vue` 和 `src/components/PatternPicker.vue` 里「内置 38 张图纸选」文案中的 **38 → 39**（目前是写死的）
+
+**⑥ 验证**：`npm run dev` → 游戏里「导入」→「从内置图纸选」，新图纸应出现且点击后铺豆正常；「图纸」参考页也应能看到新卡。
 
 ## 技术栈
 
