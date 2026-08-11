@@ -1,0 +1,34 @@
+/* ═══════════════════════════════════════════════════════════════
+   Safari / WebKit 全息效果回退
+   ── 问题 ──
+   WebKit（Safari / iOS Safari）对「同一元素同时带 filter 与 mix-blend-mode」
+   会丢弃混合、只应用 filter（WebKit Bug 293903，Safari 18.1.1 仍复现；
+   Chrome / Firefox 正常）。图纸卡片的炫彩层（.card__shine 及 :before/:after）
+   与光斑层（.card__glare）每层都同时写了 filter + mix-blend-mode，
+   于是 Safari 上全息效果退化成「高亮原图贴片」——滤镜把图案打得又亮又艳，
+   却混不进卡面，观感很差。
+
+   ── 处理 ──
+   仅对 WebKit（<html class="webkit">，由 index.html 内联脚本判定）移除这些层
+   的 filter，保留 mix-blend-mode。混合模式恢复生效后效果与 Chrome 同构；
+   丢失的只是 filter 带来的对比度/饱和度增强，Safari 下略柔和，属可接受回退。
+   再给 .card__front 加 isolation: isolate，把炫彩层的混合背景固定为卡面本身
+   （不被外层 preserve-3d / transform 语境干扰，WebKit 混合更稳）。
+   ═══════════════════════════════════════════════════════════════ */
+
+html.webkit .card__shine,
+html.webkit .card__shine:before,
+html.webkit .card__shine:after,
+html.webkit .card__glare,
+html.webkit .card__glare:before,
+html.webkit .card__glare:after {
+  /* 移除与 mix-blend-mode 同元素的 filter（WebKit 丢混合的根因）；
+     各 rarity 的 filter 强弱不一，一律置 none 最稳妥 */
+  filter: none !important;
+}
+
+html.webkit .card__front {
+  /* 炫彩/光斑层的混合背景固定为卡面（.card__front 内、其下方的卡图），
+     避免 preserve-3d 与 transform 语境在 WebKit 下引发混合隔离问题 */
+  isolation: isolate;
+}

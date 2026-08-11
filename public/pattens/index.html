@@ -4,6 +4,15 @@
 
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<script>
+			// Safari/WebKit 全息效果回退开关（配合 css/safari-fallback.css）。
+			// navigator.vendor === "Apple Computer, Inc." 仅 Safari/iOS Safari 成立
+			// （Chrome = Google Inc.、Firefox = 空），需在样式表之前执行避免闪烁。
+			// 背景：WebKit 对「filter + mix-blend-mode 同元素」会丢混合，Chrome 正常。
+			if (navigator.vendor === "Apple Computer, Inc.") {
+				document.documentElement.classList.add("webkit");
+			}
+		</script>
 		<!-- 本页是游戏 iframe 内的图纸库子页面，禁止被搜索引擎收录 -->
 		<meta name="robots" content="noindex, nofollow" />
 
@@ -54,6 +63,8 @@
 		<link rel="stylesheet" href="css/cards/shiny-vmax.css" />
 		<link rel="stylesheet" href="css/cards/swsh-pikachu.css" />
 		<link rel="stylesheet" href="css/cards/patterns.css" />
+		<!-- Safari/WebKit 全息回退（放最后，配合 <html class="webkit"> 只作用于 Safari） -->
+		<link rel="stylesheet" href="css/safari-fallback.css" />
 
 		<script type="module" crossorigin src="./assets/index.3f44670a.js"></script>
 		<link rel="stylesheet" href="./assets/index.2894a8cf.css">
