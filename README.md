@@ -75,6 +75,30 @@ npm run preview        # 默认 http://localhost:4173/
 
 push 到 GitHub 后自动触发构建部署。
 
+### SEO 与搜索引擎收录
+
+站点已接入 Google 与百度的站长平台，主动提交收录：
+
+| 平台 | 状态 | 说明 |
+| --- | --- | --- |
+| Google Search Console | ✅ 已接入 | 域名已验证（`index.html` 里的 `google-site-verification` meta）、sitemap 已提交、首页已请求收录 |
+| 百度搜索资源平台 | ✅ 已接入 | 站点已验证（`index.html` 里的 `baidu-site-verification` meta）、首页已通过 API 主动推送 |
+
+相关文件（都在 `public/`，构建后进 `dist/`）：
+
+- `robots.txt` — 允许全站抓取；`/pattens/`（图纸库，第三方内容）明确 Disallow
+- `sitemap.xml` — 站点地图（首页地址 + 更新时间）
+- `_headers` — `/pattens/*` 加 `X-Robots-Tag: noindex`；静态资源长缓存、HTML 不缓存
+- `_redirects` — SPA 回退（`/* → /index.html 200`）
+- `manifest.json` / `og-cover.jpg` / 各种尺寸 icon — PWA 与分享卡片
+
+注意：
+
+- **百度 sitemap 提交配额为 0**：需要先做 ICP 备案并在「站点属性」填写主体备案号，百度才会开放 sitemap 提交；目前用的是 API/手动提交普通收录。
+- **两个验证 meta 别删**（`index.html` 中）：`google-site-verification` 和 `baidu-site-verification`，删了会导致站长平台验证失效。
+- Cloudflare Pages 默认会把 `/xxx.html` 308 重定向到 `/xxx`（clean-URL），所以百度文件验证方式会失败——本项目用的是 HTML 标签验证，不受影响。
+
+
 ### 只重新同步图纸库
 
 只改了 `pattern-library/` 里的图纸（加图纸、调样式），不必构建整个游戏：
