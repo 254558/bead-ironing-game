@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
-import { eraseCell, expandGridKeep, getCellAt, MAX_GRID, placeBead, showStatus, store } from '../stores/game'
+import { eraseCell, expandGridKeep, getCellAt, MAX_GRID, placeBead, store } from '../stores/game'
 import type { BeadSize } from '../types'
 import { CELL, DISPLAY_CELL, FUSE_MAX, FUSE_SEALED, IRON_RADIUS, beadHash, burnAt } from '../utils/color'
 import {
@@ -509,67 +509,9 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
 
   let rotDrag: { sx: number; sy: number; yaw0: number; pitch0: number } | null = null
 
-  /* ---------- 多点触控（手机）：双指捏合缩放/平移 + 触摸点按放豆/拖拽/长按擦除 ---------- */
-
-  // 当前按下的指针（含鼠标，Map 按 pointerId 区分）。第一指走原有放豆/熨烫逻辑；
-  // 第二指落下进入双指手势（捏合缩放 + 中点平移），期间不落豆不熨烫
-  const pointers = new Map<number, { x: number; y: number }>()
-  let pinch: { dist0: number; scale0: number } | null = null
-  let panStart: { cx0: number; cy0: number; cx: number; cz: number } | null = null
-
-  /** 双指间距 */
-  function pinchDist() {
-    const [a, b] = [...pointers.values()]
-    return Math.hypot(a.x - b.x, a.y - b.y)
-  }
-
-  // 触摸手势（仅设计模式放豆）：点按（500ms 内不动不移动）放豆、拖动连续放豆、
-  // 按住 500ms 长按擦除（替代手机没有的右键）
-  let touchPending: {
-    timer: ReturnType<typeof setTimeout>
-    r: number
-    c: number
-    sx: number
-    sy: number
-    moved: boolean
-    fired: boolean
-  } | null = null
-
-  /** 结束触摸手势：placeIfTap 且是「点按」（未移动未长按）→ 在该格放豆 */
-  function clearTouchPending(placeIfTap: boolean) {
-    const t = touchPending
-    if (!t) return
-    touchPending = null
-    clearTimeout(t.timer)
-    if (placeIfTap && !t.moved && !t.fired) {
-      // 格子中心落豆：手指点按位置换算到格中心，边界更稳
-      placeBead((t.c + 0.5) * CELL, (t.r + 0.5) * CELL)
-    }
-  }
-
-  // 双指手势开始时撤销单指刚放的豆（第一指按下瞬间先放了豆，第二指落下即误放）
-  let lastTapCell: { r: number; c: number } | null = null
-
   function onPointerDown(e: PointerEvent) {
     if (e.button === 2) return
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
-
-    // 第二指落下 → 进入双指手势（捏合缩放 + 中点平移），并撤销第一指刚落下的豆
-    if (pointers.size === 2) {
-      clearTouchPending(false)
-      if (lastTapCell) {
-        eraseCell(lastTapCell.r, lastTapCell.c)
-        lastTapCell = null
-      }
-      pinch = { dist0: Math.max(pinchDist(), 1), scale0: scale }
-      const [a, b] = [...pointers.values()]
-      panStart = { cx0: (a.x + b.x) / 2, cy0: (a.y + b.y) / 2, cx: center.x, cz: center.z }
-      store.mouse.down = false // 手势期间停止放豆/熨烫
-      rotDrag = null
-      return
-    }
-
-    // 单指/鼠标：positionIron 已算出地面交点，直接复用（避免同一事件重复射线求交）
+    // positionIron 已算出地面交点，直接复用（避免同一事件重复射线求交）
     const p = positionIron(e.clientX, e.clientY)
     if (p) {
       store.mouse.x = p.x * CELL
@@ -585,69 +527,10 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
       return
     }
     if (!p) return
-    // 触屏放豆：不立即执行——等 500ms 判定 点按/拖拽/长按（橡皮模式与鼠标保持「按下即执行」）
-    if (e.pointerType === 'touch' && !store.isEraser) {
-      const cell = getCellAt(p.x * CELL, p.z * CELL)
-      if (!cell) return
-      lastTapCell = null
-      touchPending = {
-        timer: setTimeout(() => {
-          if (touchPending) {
-            touchPending.fired = true
-            if (store.grid[cell.r][cell.c].color !== null) {
-              eraseCell(cell.r, cell.c)
-              showStatus('长按擦除')
-            }
-          }
-        }, 500),
-        r: cell.r,
-        c: cell.c,
-        sx: e.clientX,
-        sy: e.clientY,
-        moved: false,
-        fired: false,
-      }
-      return
-    }
-    // 鼠标 / 橡皮模式：按下即放豆（橡皮 = 6×6 区域擦除），并记录刚新增的豆供双指手势撤销
-    const cell = getCellAt(p.x * CELL, p.z * CELL)
-    if (cell && !store.isEraser) {
-      const before = store.grid[cell.r][cell.c].color
-      placeBead(p.x * CELL, p.z * CELL)
-      lastTapCell = store.grid[cell.r][cell.c].color !== before ? cell : null
-    } else {
-      placeBead(p.x * CELL, p.z * CELL)
-      lastTapCell = null
-    }
+    placeBead(p.x * CELL, p.z * CELL)
   }
 
   function onPointerMove(e: PointerEvent) {
-    // 更新指针位置（多点触控手势用；move 挂在 window 上，双指事件都能收到）
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
-
-    // 双指手势：捏合缩放 + 中点平移（期间不走放豆/熨烫/悬停逻辑）
-    if (pointers.size === 2 && pinch && panStart) {
-      const d = pinchDist()
-      if (pinch.dist0 > 1) {
-        scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, pinch.scale0 * (d / pinch.dist0)))
-      }
-      // 中点移动 → 视野反向平移（步长 = 屏宽每像素的地面长度，与 onKeyDown 同规则）
-      const { w } = viewportSize()
-      const pr = groundPoint(1, 0, _gpOut)
-      const pl = groundPoint(-1, 0, _gpOut2)
-      if (pr && pl) {
-        const step = Math.max(1e-6, Math.abs(pr.x - pl.x) / w)
-        const [a, b] = [...pointers.values()]
-        const mx = (a.x + b.x) / 2
-        const my = (a.y + b.y) / 2
-        center.x = panStart.cx + (panStart.cx0 - mx) * step
-        center.z = panStart.cz + (panStart.cy0 - my) * step
-      }
-      applyView()
-      ensureGridFitsViewport()
-      return
-    }
-
     // 命中过滤：pointermove 挂在 window 上，指针落在 UI 覆盖层（透明侧栏/对话框/作品列表）时
     // 直接跳过，不做射线与样式计算。画布铺满全窗口（覆盖层悬浮其上），不能用 rect 范围判断，
     // 用 elementFromPoint 取该点顶层元素：不是画布容器内的元素即为覆盖层；
@@ -682,38 +565,11 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     store.mouse.x = p.x * CELL
     store.mouse.y = p.z * CELL
 
-    // 触摸手势：移动 >8px 由「点按」转为「拖拽」；长按触发后继续拖动 = 沿路径连续擦除
-    if (touchPending) {
-      const t = touchPending
-      if (!t.moved && Math.hypot(e.clientX - t.sx, e.clientY - t.sy) > 8) {
-        t.moved = true
-        clearTimeout(t.timer) // 开始拖拽，取消长按判定
-      }
-      if (t.fired) {
-        // 长按擦除后拖动：触屏版右键擦除的拖拽形态
-        const cell = getCellAt(p.x * CELL, p.z * CELL)
-        if (cell) eraseCell(cell.r, cell.c)
-        return
-      }
-      if (t.moved) {
-        placeBead(p.x * CELL, p.z * CELL)
-        return
-      }
-      return // 尚未判定手势，等松手（<500ms 抬起 = 点按放豆）
-    }
-
     // 设计模式按住拖拽连续放豆/擦除（placeBead 仅在内容实际变化时递增 gridVersion）
     if (store.mode === 'design' && !store.viewMode && store.mouse.down) placeBead(p.x * CELL, p.z * CELL)
   }
 
-  function onPointerUp(e: PointerEvent) {
-    pointers.delete(e.pointerId)
-    if (pointers.size < 2) {
-      pinch = null
-      panStart = null
-    }
-    // 触摸点按（未移动未长按）在此放豆：500ms 内抬起 = 点按
-    if (touchPending) clearTouchPending(true)
+  function onPointerUp() {
     rotDrag = null
     store.mouse.down = false
   }
@@ -1013,8 +869,6 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   el.addEventListener('pointerdown', onPointerDown)
   window.addEventListener('pointermove', onPointerMove)
   window.addEventListener('pointerup', onPointerUp)
-  // 触摸指针可能被系统手势打断（iOS 来电横幅等）→ 与松手同样清理
-  el.addEventListener('pointercancel', onPointerUp)
   window.addEventListener('keydown', onKeyDown)
   container.addEventListener('pointerleave', onLeave)
   el.addEventListener('wheel', onWheel, { passive: false })
