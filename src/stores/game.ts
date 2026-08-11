@@ -168,7 +168,7 @@ export function expandGridKeep(minCols: number, minRows: number) {
 
 /**
  * 窗口/容器尺寸变化 → 把网格扩容到覆盖视口（内容坐标不变，只追加空行/列）。
- * 视口状态由 useThreeBoard 维护（scale=1 时每格 DISPLAY_CELL 显示像素），
+ * 视口状态由 three/board.ts 维护（scale=1 时每格 DISPLAY_CELL 显示像素），
  * 这里按默认缩放的可见格数估算，棋盘渲染器随后会按实际可见范围再次扩容。
  */
 export function setupGrid(w: number, h: number) {

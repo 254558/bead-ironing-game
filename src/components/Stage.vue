@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, useTemplateRef } from 'vue'
 import { setupGrid, showStatus, startAutosave, stopAutosave, store } from '../stores/game'
-import PixelCanvas from './PixelCanvas.vue'
+import BoardView from './BoardView.vue'
 import SavePanel from './SavePanel.vue'
 import StatusBar from './StatusBar.vue'
 
@@ -37,7 +37,7 @@ onUnmounted(() => {
 
 <template>
   <div ref="root" class="canvas-wrap">
-    <PixelCanvas />
+    <BoardView />
     <SavePanel />
     <StatusBar />
   </div>

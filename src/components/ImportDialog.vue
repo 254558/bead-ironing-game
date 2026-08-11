@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useTemplateRef } from 'vue'
 import { store } from '../stores/game'
-import { importImage } from '../composables/useImageImport'
+import { importImage } from '../utils/imageImport'
 import type { ImportMode } from '../types'
 
 const fileInput = useTemplateRef<HTMLInputElement>('fileInput')

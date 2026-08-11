@@ -1,16 +1,15 @@
 import type { BeadSize } from '../types'
 
-/** 布局与物理常量（与原 HTML 一致） */
+/** 布局与物理常量 */
 export const CELL = 14
 export const DISPLAY_CELL = 36
-export const BEAD_R = 6
 /** 熨烫半径（×14 单位 ≈ 格数）：≈7 格，以熨斗图标中心为圆心，覆盖约 15×15 格 */
 export const IRON_RADIUS = 98
-export const FUSE_MIN = 0.3
 export const FUSE_MAX = 0.7
 /** 孔洞完全闭合的熔融下限：烫到此处起珠子无孔，保持到烫糊前（「刚好」容错区间） */
 export const FUSE_SEALED = 0.5
-export const BURN = 0.85
+/** 豆子烫糊阈值（仅供 burnAt 使用，按豆子规格修正） */
+const BURN = 0.85
 export const IRON_SPEED = 1.0
 export const MAX_PIX = 60
 
@@ -27,7 +26,7 @@ export const COLORS = [
   '#83769c', '#ffccaa', '#c2c3c7', '#7e2553', '#008751', '#ab5236', '#5f574f', '#ff6e27',
 ]
 
-export function hexToRgb(h: string): [number, number, number] {
+function hexToRgb(h: string): [number, number, number] {
   if (h.startsWith('rgb')) {
     const m = h.match(/\d+/g)!
     return [Number(m[0]), Number(m[1]), Number(m[2])]

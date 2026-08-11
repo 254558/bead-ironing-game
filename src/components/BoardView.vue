@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, useTemplateRef, watch } from 'vue'
 import { useIroning } from '../composables/useIroning'
-import { createThreeBoard, type ThreeBoardHandle } from '../composables/useThreeBoard'
+import { createThreeBoard, type ThreeBoardHandle } from '../three/board'
 import { store } from '../stores/game'
 
 const wrap = useTemplateRef<HTMLDivElement>('wrap')

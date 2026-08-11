@@ -1,18 +1,20 @@
 # 熨烫拼豆 · Bead Ironing
 
-一个像素风拼豆（perler beads）创作应用：在网格画布上摆放彩色拼豆，模拟熨烫让豆子熔融，最后用 Three.js 以 3D 视角查看成品。
+一个像素风拼豆（perler beads）创作应用：在 Three.js 实时 3D 棋盘上摆放彩色拼豆，模拟熨烫让豆子熔融变形，可旋转视角从任意角度欣赏成品。
 
-基于 Vue 3 + Vite + TypeScript + Three.js，带复古 CRT 滤镜。
+基于 Vue 3 + Vite + TypeScript + Three.js。
 
 **在线体验：[pindou520.fun](https://pindou520.fun)（免下载，浏览器直接玩）**
 
 ## 功能特性
 
-- **设计模式** — 32 色调色板点击/拖拽放珠，右键擦除，滚轮缩放（0.3~12 倍），网格随窗口自适应
-- **熨烫模式** — 按住鼠标模拟熨斗，熔融度随距离衰减，进度条实时显示 IRONING / CAREFUL / OK! / BURNED
-- **3D 预览** — 空心珠与熔融扁珠按熔融度分别建模（InstancedMesh 批量渲染），拖拽旋转、滚轮缩放
-- **图片导入** — 任意图片转拼豆图案：自动量化为 32 色、居中放置、画布自动扩容
-- **复古像素风** — CRT 扫描线/暗角/闪烁滤镜，Press Start 2P 像素字体
+- **实时 3D 棋盘** — 全程 Three.js 渲染（不再有 2D 画布）：EVA 哑光塑料材质、实时阴影、倾斜俯视角，点击/拖拽放豆，右键精细擦除，滚轮锚点缩放（0.25~12 倍），网格随窗口/视角自动扩容
+- **设计模式** — 右侧 32 色轮盘选色，橡皮擦（✕，6×6 区域）与右键擦除互补；豆子分 5mm 大豆 / 2.6mm 迷你豆两种规格
+- **熨烫模式** — 按住鼠标模拟熨斗，熔融度随距离椭圆衰减；豆子逐渐压扁、颜色加深，烫过头（burned）会变黑
+- **视角工具** — 隐藏棋盘线，左键拖拽旋转视角、WASD 移动视角，回到设计模式后视角保留可继续放豆
+- **图片导入** — 两种方式：导入成图纸（像素参考层，自己对照放豆）或直接生成豆子（自动铺好，只需熨烫）；自动量化为 32 色、居中放置、画布自动扩容，标准网格图纸（40×40 等）可精确 1:1 还原
+- **内置图纸库** — 38 张宝可梦卡牌全息效果图纸（pattens/），点选一张自动铺好豆子
+- **作品存档** — 多幅作品保存到 localStorage（自动缩略图），随时恢复/删除；每 5 秒 + 关页前自动存档，刷新不丢豆
 
 ## 快速开始
 
@@ -35,34 +37,40 @@ npm run preview  # 本地预览构建产物
 
 ## 玩法
 
-1. **放豆**：点选右侧色板颜色，在画布上点击或拖拽摆放拼豆；点 `X` 切换橡皮擦
-2. **熨烫**：点「熨 烫」进入，按住鼠标在豆子上来回移动，豆子会熔融变扁、颜色加深；注意别烫过头（BURNED）
-3. **3D 查看**：点「3D」查看立体成品，拖拽旋转视角、滚轮缩放
-4. **导入图片**：点「导 入 图 片」选一张图，自动转成拼豆图案后回到设计模式继续编辑
+1. **放豆**：左侧点「设计」，右侧色轮选颜色，在画布上点击或拖拽摆放拼豆；色轮第 0 项是橡皮擦（✕），右键可精细擦除单颗
+2. **熨烫**：点「熨烫」进入，按住鼠标在豆子上来回移动，豆子会熔融变扁、颜色加深；迷你豆壁薄升温更快，更容易烫糊
+3. **视角**：点「视角」调整——左键拖拽旋转视角、WASD 移动视角，调整好点「设计」继续放豆（视角保持不变）
+4. **导入**：点「导入」选一张图片，可选择「图纸」（对照放豆）或「直接生成豆子」（自动铺好，只需熨烫）；也可以从内置 38 张图纸里挑
+5. **保存**：点「保存」把当前画布存为作品，点「恢复」从列表载入或删除
 
-> 提示：切回「设 计」模式会重置所有熔融度，3D 视图需要先熨烫至少一颗豆子才能进入。
+> 提示：切回「设计」模式会重置所有熔融度。
 
 ## 项目结构
 
 ```text
 src/
-  types.ts                 # 核心类型（Cell / Mode 等）
-  stores/game.ts           # 全局状态（模块级单例，reactive + actions）
-  utils/color.ts           # 调色板、颜色工具、物理常量
+  types.ts                 # 核心类型（Cell / Mode / BeadSize 等）
+  stores/game.ts           # 全局状态（模块级单例，reactive + actions，含自动存档）
+  utils/
+    color.ts               # 调色板、颜色工具、布局与物理常量
+    thumbnail.ts           # 作品缩略图渲染（离屏 canvas）
+    imageImport.ts         # 图片 → 32 色量化 → 写入网格（含标准网格图纸识别）
+  three/
+    board.ts               # three.js 3D 棋盘（光照/阴影/无限画布/放豆与视角交互，createThreeBoard 工厂）
+    beadGeometry.ts        # 珠子几何体与 EVA 材质（空心 / 熔融带孔 / 完全熔融）
   composables/
-    useRender2D.ts         # 2D 画布渲染（网格/珠子/悬停/熨斗光标）
-    useIroning.ts          # rAF 熨烫循环 + 熔融/进度计算
-    useImageImport.ts      # 图片 → 32 色量化 → 写入网格
-    useThreeScene.ts       # Three.js 3D 场景（动态 import，独立 chunk）
+    useIroning.ts          # 熨烫 rAF 循环 + 熔融计算
   components/
-    ToolPanel.vue          # 模式切换 / 导入 / 清空
-    PaletteBar.vue         # 32 色色板 + 橡皮擦
-    Stage.vue              # 主舞台（画布 + 3D + 覆盖层）
-    PixelCanvas.vue        # 2D 画布与交互
-    View3D.vue             # 3D 容器（按需加载 three）
-    IronProgress.vue       # 熨烫进度条
-    StatusBar.vue          # 顶部提示条
-    CRTOverlay.vue         # CRT 滤镜
+    ToolPanel.vue          # 左侧工具菜单（设计 / 熨烫 / 视角 / 导入 / 图纸 / 保存 / 恢复 / 清空）
+    ColorWheelPanel.vue    # 右侧 32 色轮盘 + 橡皮擦
+    Stage.vue              # 主舞台（3D 棋盘 + 覆盖层）
+    BoardView.vue          # 3D 棋盘宿主（创建/销毁棋盘，响应模式与网格变化）
+    SavePanel.vue          # 作品列表（恢复 / 删除）
+    StatusBar.vue          # 状态提示（PrimeVue Toast）
+    ImportDialog.vue       # 导入方式选择对话框
+    PatternPicker.vue      # 内置 38 张图纸选择
+    CardsView.vue          # 图纸库全屏 iframe（public/pattens/）
+    bits/                  # 第三方组件（vue-bits：LineSidebar / OptionWheel，已本地化适配）
 ```
 
 ## 技术栈
@@ -71,10 +79,10 @@ src/
 | --- | --- |
 | 框架 | Vue 3.5（Composition API, `<script setup>`） |
 | 构建 | Vite 8 + TypeScript 5.9 |
-| 3D | three 0.185 + OrbitControls |
+| 3D | three 0.185 + OrbitControls（旋转阻尼） |
 | 状态管理 | 模块级单例 store（未引入 Pinia） |
+| UI | PrimeVue（Toast 提示）+ Tailwind CSS 4 + vue-bits 交互组件 |
 
 ## 相关
 
 - 仓库：[github.com/254558/bead-ironing-game](https://github.com/254558/bead-ironing-game)
-

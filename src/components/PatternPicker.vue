@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
 import { store } from '../stores/game'
-import { importImage } from '../composables/useImageImport'
+import { importImage } from '../utils/imageImport'
 
 /** 38 张内置图纸（与图纸库 pattens/patterns/ 一一对应，1024×1024、40×40 标准网格图纸） */
 const PATTERNS = [

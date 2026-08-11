@@ -193,7 +193,7 @@ body {
   overflow: hidden; /* 无限画布：平移/缩放由三维棋盘自绘，不使用原生滚动条 */
 }
 
-/* three.js 棋盘画布：全尺寸铺满视口，禁用触摸滚动手势（滚轮缩放由 useThreeBoard 接管） */
+/* three.js 棋盘画布：全尺寸铺满视口，禁用触摸滚动手势（滚轮缩放由 three/board.ts 接管） */
 .scroll-wrap canvas {
   display: block;
   width: 100%;

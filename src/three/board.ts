@@ -12,7 +12,7 @@ import {
   createFilledBeadGeometry,
   createFusedBeadGeometry,
   createHollowBeadGeometry,
-} from './useBeadGeometry'
+} from './beadGeometry'
 import clawdDizzyUrl from '../assets/clawd-dizzy.svg'
 
 export interface ThreeBoardHandle {

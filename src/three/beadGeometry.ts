@@ -51,7 +51,7 @@ function splitSideWallGroups(geo: THREE.BufferGeometry, threshold: number): void
 
 /**
  * 空心珠几何体（EVA 空心短圆筒）：圆环拉伸（高细分、圆润边缘），俯视可见贯穿珠孔。
- * 孔径占比随豆子规格变化。拼豆棋盘（useThreeBoard）专用，
+ * 孔径占比随豆子规格变化。拼豆棋盘（three/board.ts）专用，
  */
 export function createHollowBeadGeometry(size: BeadSize = 'big'): THREE.ExtrudeGeometry {
   const ringShape = new THREE.Shape()
