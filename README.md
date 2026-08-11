@@ -28,12 +28,62 @@ npm install
 npm run dev
 ```
 
-生产构建与预览：
+开发时改了 `pattern-library/` 里的图纸，`npm run build:patterns` 重新同步后刷新浏览器即可（详见下文「构建与打包」）。
+
+## 构建与打包
+
+### 一次完整构建
 
 ```bash
-npm run build       # 先同步图纸库（build:patterns）→ 类型检查（vue-tsc）→ 构建到 dist/
-npm run preview     # 本地预览构建产物
+npm run build
 ```
+
+一条命令完成三步，最终产物全部输出到 `dist/`：
+
+| 步骤 | 命令 | 作用 |
+| --- | --- | --- |
+| 1 | `npm run build:patterns` | 构建图纸库（`pattern-library/`，Vite 3 + Svelte 3 静态站），并同步产物到 `public/pattens/`（游戏 iframe 加载的静态文件） |
+| 2 | `vue-tsc -b` | 游戏代码 TypeScript 类型检查 |
+| 3 | `vite build` | 构建游戏，并把 `public/` 原样复制进 `dist/` |
+
+### 产物结构
+
+```text
+dist/
+  index.html            # 游戏入口
+  assets/               # 游戏 JS/CSS 包
+  pattens/              # 图纸库静态文件（游戏 iframe 加载，来自 public/pattens/）
+```
+
+> `dist/` 是构建产物，已在 .gitignore 中，不入库。
+
+### 本地预览构建产物
+
+```bash
+npm run preview        # 默认 http://localhost:4173/
+```
+
+### 部署（Cloudflare Pages）
+
+部署在 Cloudflare Pages 控制台完成（仓库内没有 CI 配置），配置如下：
+
+| 配置项 | 值 |
+| --- | --- |
+| 框架预设 | Vite |
+| 构建命令 | `npm run build` |
+| 输出目录 | `dist` |
+
+push 到 GitHub 后自动触发构建部署。
+
+### 只重新同步图纸库
+
+只改了 `pattern-library/` 里的图纸（加图纸、调样式），不必构建整个游戏：
+
+```bash
+npm run build:patterns
+```
+
+重新构建图纸库并同步到 `public/pattens/`。同步规则见下文「图纸库（pattern-library/）」一节。
 
 ## 玩法
 
