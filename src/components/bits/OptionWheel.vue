@@ -2,7 +2,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, type CSSProperties, type ComponentPublicInstance } from 'vue';
 
 // 摘自 vue-bits（DavidHDev/vue-bits，MIT+Commons Clause）：https://vue-bits.dev/components/option-wheel
-// 适配：新增 swatch 色块模式（选项渲染为圆形色块）、eraserIndex（橡皮项特殊渲染）、受控 selected prop。
+// 适配：新增 swatch 色块模式（选项渲染为圆形色块）、eraserIndex（橡皮项特殊渲染）、受控 selected prop（位置跟随）、橡皮再点重发 change。
 
 export type Side = 'left' | 'right';
 
@@ -218,6 +218,14 @@ const handlePointerEnd = () => {
 
 const handleItemClick = (index: number) => {
   if (dragMoved) return;
+  // 再点当前选中的橡皮：applyTarget 因索引未变不会重发 change，而橡皮开关由外部监听
+  // change 驱动（点一次开、再点关）。这里对已选中的橡皮项强制补发一次，轮盘位置
+  // 随后由受控 selected 的 watcher 滑回当前颜色
+  if (index === props.eraserIndex && selectedValue.value === index) {
+    emit('change', index, props.items[index]);
+    playTick();
+    return;
+  }
   const n = props.items.length;
   const cur = target;
   let d = index - (((cur % n) + n) % n);
@@ -270,6 +278,15 @@ watch(
   ],
   () => applyTarget(target, false),
   { deep: true }
+);
+
+// 受控 selected：外部状态变化（如橡皮再点退出后）时，轮盘位置跟随滑到该项。
+// 只更新 aria/高亮会留下"指针还停在橡皮上"的错位，这里补上位置这一环
+watch(
+  () => props.selected,
+  (sel) => {
+    if (sel != null) applyTarget(sel, false);
+  }
 );
 
 let removeWheelListener: (() => void) | null = null;

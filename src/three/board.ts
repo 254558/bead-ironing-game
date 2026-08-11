@@ -329,6 +329,12 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
       scene.fog = fogShown ? fog : null
       changed = true
     }
+    // 退出视角工具：WASD/拖拽提示若还挂着（自动隐藏前）立即收起并清掉定时器，不留残留
+    if (showBoard && viewHint.style.display === 'block') {
+      viewHint.style.display = 'none'
+      viewHint.style.opacity = '0'
+      clearTimeout(hintTimer)
+    }
     return changed
   }
 
