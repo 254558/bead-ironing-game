@@ -1,4 +1,4 @@
-import { computed, reactive } from 'vue'
+import { computed, markRaw, reactive } from 'vue'
 import type { BeadSize, Cell, ImportMode, IronCenter, Mode, MouseState, SavedBoard } from '../types'
 import { CELL, COLORS } from '../utils/color'
 import { renderThumb } from '../utils/thumbnail'
@@ -60,26 +60,54 @@ const AUTOSAVE_KEY = 'bead-iron.autosave'
 interface AutosaveState {
   cols: number
   rows: number
-  grid: Cell[][]
+  /** 稀疏存储：只保留已占用格子（颜色或图纸像素非空）的坐标与内容，空板不写 */
+  cells: AutosaveCell[]
   savedAt: number
 }
 
-/** 从 localStorage 读取自动存档（容错：损坏/为空时返回 null） */
-function readAutosave(): AutosaveState | null {
+interface AutosaveCell {
+  r: number
+  c: number
+  color: string | null
+  pixel: string | null
+}
+
+/**
+ * 从 localStorage 读取自动存档并展开为完整网格（容错：损坏/为空时返回 null）。
+ * 兼容新版稀疏 cells 与旧版全量 grid（旧数据恢复时熔融度同样清零）。
+ * 返回结构与 store 初始化所需一致（autosave.grid 为展开后的完整网格）。
+ */
+function readAutosave(): { cols: number; rows: number; grid: Cell[][]; savedAt: number } | null {
   try {
     const raw = localStorage.getItem(AUTOSAVE_KEY)
     if (!raw) return null
-    const d = JSON.parse(raw) as AutosaveState
-    if (!d || !Array.isArray(d.grid) || d.grid.length === 0 || !Array.isArray(d.grid[0])) return null
-    // 恢复时统一回设计模式：熔融度清零，豆子颜色与图纸像素保留
-    return {
-      cols: d.cols,
-      rows: d.rows,
-      grid: d.grid.map((row) =>
-        row.map((c) => ({ color: c.color ?? null, melt: 0, pixel: c.pixel ?? null })),
-      ),
-      savedAt: d.savedAt,
+    const d = JSON.parse(raw) as Partial<AutosaveState> & { grid?: Cell[][] }
+    if (!d || typeof d.cols !== 'number' || typeof d.rows !== 'number' || d.cols <= 0 || d.rows <= 0) return null
+    const grid = createGrid(Math.min(d.cols, MAX_GRID), Math.min(d.rows, MAX_GRID))
+    const firstRow = grid[0]
+    if (Array.isArray(d.cells)) {
+      // 新版：稀疏单元格列表，逐格放回对应坐标
+      for (const s of d.cells) {
+        if (!s || s.r < 0 || s.r >= grid.length || s.c < 0 || !firstRow || s.c >= firstRow.length) continue
+        grid[s.r][s.c] = { color: s.color ?? null, melt: 0, pixel: s.pixel ?? null }
+      }
+    } else if (Array.isArray(d.grid)) {
+      // 旧版：全量二维网格（含 melt，恢复时统一清零）
+      for (let r = 0; r < Math.min(grid.length, d.grid.length); r++) {
+        const row = d.grid[r]
+        if (!Array.isArray(row)) continue
+        for (let c = 0; c < Math.min(grid[r].length, row.length); c++) {
+          const s = row[c]
+          if (!s) continue
+          grid[r][c] = { color: s.color ?? null, melt: 0, pixel: s.pixel ?? null }
+        }
+      }
+    } else {
+      return null
     }
+    // 恢复时统一回设计模式：熔融度清零（稀疏存储不保存 melt，旧全量数据同样清零）
+    // createGrid 由 rows≥1 构造，首行必然存在
+    return { cols: firstRow!.length, rows: grid.length, grid, savedAt: typeof d.savedAt === 'number' ? d.savedAt : 0 }
   } catch {
     return null
   }
@@ -92,7 +120,10 @@ const autosave = readAutosave()
 export const store = reactive({
   cols: autosave?.cols ?? 30,
   rows: autosave?.rows ?? 30,
-  grid: (autosave?.grid ?? createGrid(30, 30)) as Cell[][],
+  /** 网格内容：markRaw 脱离深度代理（无任何 UI 模板读取格子，变化经 gridVersion 手动失效）。
+   *  否则最大 200×200=4 万格 × 每格对象都会被 reactive 深代理——扩容/熨烫每帧写穿
+   *  Proxy setter，纯开销无收益 */
+  grid: markRaw(autosave?.grid ?? createGrid(30, 30)) as Cell[][],
   /** 网格内容版本号：任何珠子/图纸变更时 +1，供画布静态层缓存失效检测 */
   gridVersion: 0,
   mode: 'design' as Mode,
@@ -127,10 +158,12 @@ export const store = reactive({
   restoredFromAutosave: autosave !== null,
 })
 
-/** 存在任意珠子（熨烫按钮可用） */
-export const hasBeads = computed(() =>
-  store.grid.some((row) => row.some((c) => c.color !== null)),
-)
+/** 存在任意珠子（熨烫按钮可用）。
+ *  grid 已 markRaw 脱离响应式，改依赖 gridVersion（内容任何变化都 +1）触发重算 */
+export const hasBeads = computed(() => {
+  void store.gridVersion
+  return store.grid.some((row) => row.some((c) => c.color !== null))
+})
 
 let statusTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -159,7 +192,7 @@ export function expandGridKeep(minCols: number, minRows: number) {
   const g = createGrid(nc, nr)
   for (let r = 0; r < store.rows; r++)
     for (let c = 0; c < store.cols; c++) g[r][c] = store.grid[r][c]
-  store.grid = g
+  store.grid = markRaw(g)
   store.cols = nc
   store.rows = nr
   store.gridVersion++ // 网格线数量变化，静态层缓存失效
@@ -180,7 +213,7 @@ export function expandGrid(minCols: number, minRows: number) {
   if (store.cols < minCols || store.rows < minRows) {
     store.cols = Math.max(store.cols, minCols)
     store.rows = Math.max(store.rows, minRows)
-    store.grid = createGrid(store.cols, store.rows)
+    store.grid = markRaw(createGrid(store.cols, store.rows))
   }
 }
 
@@ -310,7 +343,7 @@ export function toggleEraser() {
 export function saveBoard() {
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const name = `作品 ${store.savedBoards.length + 1}`
-  const grid = store.grid.map((row) => row.map((cell) => ({ ...cell })))
+  const grid = markRaw(store.grid.map((row) => row.map((cell) => ({ ...cell }))))
   store.savedBoards.push({
     id,
     name,
@@ -331,7 +364,7 @@ export function loadBoard(id: string) {
   if (!board) return
   store.cols = board.cols
   store.rows = board.rows
-  store.grid = board.grid.map((row) => row.map((cell) => ({ ...cell })))
+  store.grid = markRaw(board.grid.map((row) => row.map((cell) => ({ ...cell }))))
   store.gridVersion++
   markDirty()
   store.mode = 'design' // 直接赋值：避免 switchMode 清零 melt
@@ -360,15 +393,23 @@ export function markDirty() {
   contentDirty = true
 }
 
-/** 把当前画布整体写入自动存档（空板不覆盖旧档，保证误触清空后仍能找回） */
+/** 把当前画布写入自动存档（空板不覆盖旧档，保证误触清空后仍能找回）。
+ *  稀疏存储：只序列化非空格子（{r,c,color,pixel}），不整表 JSON.stringify——
+ *  全空画布 0 条记录，画满也远小于完整 40k 格网格。熔融度不存（恢复时本就清零） */
 export function autosaveNow() {
   if (!contentDirty) return
   contentDirty = false
   if (!hasContent()) return
   try {
+    const cells: AutosaveState['cells'] = []
+    for (let r = 0; r < store.rows; r++)
+      for (let c = 0; c < store.cols; c++) {
+        const cell = store.grid[r][c]
+        if (cell.color !== null || cell.pixel !== null) cells.push({ r, c, color: cell.color, pixel: cell.pixel })
+      }
     localStorage.setItem(
       AUTOSAVE_KEY,
-      JSON.stringify({ cols: store.cols, rows: store.rows, grid: store.grid, savedAt: Date.now() } as AutosaveState),
+      JSON.stringify({ cols: store.cols, rows: store.rows, cells, savedAt: Date.now() } as AutosaveState),
     )
   } catch {
     /* 存储超限等场景静默失败 */

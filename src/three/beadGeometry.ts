@@ -214,9 +214,7 @@ function createEvaCapMaterial(opts: { glossySpots: boolean }): THREE.MeshPhysica
     ),
     metalness: 0,
     clearcoat: 0,
-    transmission: 0.02,
-    ior: 1.46,
-    thickness: 1.0,
+    // transmission 归零：不透明 EVA 材质无可感知透射，>0 会让 three 额外跑透射 pass（纯成本）
     envMapIntensity: 0.12,
     specularIntensity: 0.2,
   })
@@ -234,9 +232,7 @@ function createEvaSideMaterial(opts: { glossy: boolean }): THREE.MeshPhysicalMat
     metalness: 0,
     clearcoat: 0.7,
     clearcoatRoughness: 0.14,
-    transmission: 0.03,
-    ior: 1.46,
-    thickness: 1.2,
+    // transmission 归零：同 cap 材质——不透明 EVA 不跑透射 pass
     envMapIntensity: 2.2,
     specularIntensity: 1.5,
   })

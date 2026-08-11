@@ -285,13 +285,30 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   }
 
   /** 场景可见性：视角模式隐藏全部平面（地面/网格线/图纸），只看拼豆悬浮，转正面↔背面无任何面挡在中间；
-   *  设计模式显示工作台供放豆，网格线再按缩放后每格的显示密度决定 */
-  function updateSceneVisibility() {
+   *  设计模式显示工作台供放豆，网格线再按缩放后每格的显示密度决定。
+   *  返回可见性是否变化（供按需渲染判断） */
+  function updateSceneVisibility(): boolean {
     const showBoard = !store.viewMode
-    gridLines.visible = showBoard && DISPLAY_CELL * scale >= MIN_GRID_LINE_PX
-    ground.visible = showBoard
-    if (patternMesh) patternMesh.visible = showBoard
-    scene.fog = showBoard ? fog : null
+    const showGrid = showBoard && DISPLAY_CELL * scale >= MIN_GRID_LINE_PX
+    let changed = false
+    if (gridLines.visible !== showGrid) {
+      gridLines.visible = showGrid
+      changed = true
+    }
+    if (ground.visible !== showBoard) {
+      ground.visible = showBoard
+      changed = true
+    }
+    if (patternMesh && patternMesh.visible !== showBoard) {
+      patternMesh.visible = showBoard
+      changed = true
+    }
+    const fogShown = showBoard
+    if (fogShown !== (scene.fog === fog)) {
+      scene.fog = fogShown ? fog : null
+      changed = true
+    }
+    return changed
   }
 
   /** 相机按当前 center/scale/yaw/pitch 定位（yaw=π、pitch=55° 时与初始固定视角一致） */
@@ -312,6 +329,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     fill.position.set(center.x - 70, 70, center.z - 50)
     fill.target.position.set(center.x, 0, center.z)
     updateSceneVisibility()
+    markRender()
   }
 
   /** 写入单个珠子 instance 的矩阵/颜色（熔融形态公式，按豆子规格缩放）。
@@ -513,6 +531,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     store.iron.x = -1
     store.iron.y = -1
     hoverBox.visible = false
+    markRender()
   }
 
   function onWheel(e: WheelEvent) {
@@ -538,6 +557,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     controls.target.set(center.x, 0, center.z)
     updateSceneVisibility()
     ensureGridFitsViewport()
+    markRender()
   }
 
   function onContext(e: MouseEvent) {
@@ -551,41 +571,80 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
 
   /* ---------- 每帧 ---------- */
 
-  function updateHover() {
+  /** 悬停框跟随鼠标：返回本帧位置/可见性是否变化（供按需渲染判断） */
+  function updateHover(): boolean {
     if (store.mode !== 'design' || store.viewMode) {
-      hoverBox.visible = false
-      return
+      if (hoverBox.visible) {
+        hoverBox.visible = false
+        return true
+      }
+      return false
     }
     const cell = getCellAt(store.mouse.x, store.mouse.y)
     if (!cell) {
-      hoverBox.visible = false
-      return
+      if (hoverBox.visible) {
+        hoverBox.visible = false
+        return true
+      }
+      return false
     }
     const b = store.grid[cell.r][cell.c]
     const m = b?.melt ?? 0
     const s = BEAD_SCALE[size].s
     const h = b?.color ? s * BEAD_HEIGHT * (1 - m * 0.92) + 0.1 : 0.08
-    hoverBox.position.set(cell.c + 0.5, h, cell.r + 0.5)
-    hoverBox.visible = true
+    const x = cell.c + 0.5
+    const y = h
+    const z = cell.r + 0.5
+    const moved =
+      !hoverBox.visible ||
+      hoverBox.position.x !== x ||
+      hoverBox.position.y !== y ||
+      hoverBox.position.z !== z
+    if (moved) {
+      hoverBox.position.set(x, y, z)
+      hoverBox.visible = true
+    }
+    return moved
   }
 
-  function updateIronOverlay() {
-    ironImg.style.display = store.mode === 'ironing' && store.mouse.x >= 0 ? 'block' : 'none'
+  /** 熨斗游标显隐：返回本帧是否切换（供按需渲染判断） */
+  function updateIronOverlay(): boolean {
+    const show = store.mode === 'ironing' && store.mouse.x >= 0
+    const shown = ironImg.style.display === 'block'
+    if (show !== shown) {
+      ironImg.style.display = show ? 'block' : 'none'
+      return true
+    }
+    return false
+  }
+
+  /** 按需渲染：静止（无交互/无动画变化）时挂起 renderer.render，GPU 完全空闲；
+   *  任何状态变更路径（指针/滚轮/键盘/熨烫/重建/缩放）都通过 markRender 或上面的
+   *  *_changed 返回值唤醒一帧渲染。rAF 循环保留（每帧只做廉价比较），静止时不再
+   *  每帧重绘整场景 + 1024² 阴影贴图 */
+  let renderDirty = true
+  function markRender() {
+    renderDirty = true
   }
 
   let raf = 0
   function animate() {
     raf = requestAnimationFrame(animate)
+    let changed = false
     // 设计模式兜底：若视角仍低于 DESIGN_PITCH_MIN（从背面视角直接切回放豆），抬回安全俯仰角
     if (!store.viewMode && pitch < DESIGN_PITCH_MIN) {
       pitch = DESIGN_PITCH_MIN
       applyView()
+      changed = true
     }
-    updateIronOverlay()
-    updateHover()
-    updateSceneVisibility() // 模式开关即时隐藏/恢复地面、网格线、图纸与雾
-    controls.update()
-    renderer.render(scene, camera)
+    changed = updateIronOverlay() || changed
+    changed = updateHover() || changed
+    changed = updateSceneVisibility() || changed
+    if (renderDirty || changed) {
+      renderDirty = false
+      controls.update()
+      renderer.render(scene, camera)
+    }
   }
 
   /* ---------- 对外接口 ---------- */
@@ -601,7 +660,8 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   }
 
   function update() {
-    if (store.mode !== 'ironing' || store.mouse.x < 0) return
+    // 鼠标未按下时熔融值不会变化，跳过整个窗口遍历与 buffer 重写（熨烫 idle 帧零开销）
+    if (store.mode !== 'ironing' || store.mouse.x < 0 || !store.mouse.down) return
     // 渲染更新区域与熔融判定一致：以熨斗图标中心（熨烫中心）为圆心
     const mx = store.iron.x / CELL
     const mz = store.iron.y / CELL
@@ -639,11 +699,13 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
       m.instanceMatrix.needsUpdate = true
       if (m.instanceColor) m.instanceColor.needsUpdate = true
     }
+    markRender()
   }
 
   function rebuild() {
     buildBeadInstances()
     rebuildPattern()
+    markRender()
   }
 
   let rebuildPending = false
