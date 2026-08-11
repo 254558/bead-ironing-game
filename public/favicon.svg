@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+  <!-- 熨斗小角色 favicon：取 clawd-dizzy.svg 角色主体（去星星动画），静态渲染 -->
+  <!-- 地面阴影 -->
+  <rect x="3.5" y="12" width="9" height="1" fill="#000000" opacity="0.5"/>
+  <!-- 腿 -->
+  <g fill="#DE886D">
+    <rect x="3.5" y="10" width="1" height="2"/>
+    <rect x="5.5" y="10" width="1" height="2"/>
+    <rect x="9.5" y="10" width="1" height="2"/>
+    <rect x="11.5" y="10" width="1" height="2"/>
+    <!-- 躯干 -->
+    <rect x="2.5" y="3" width="11" height="7"/>
+    <!-- 手臂 -->
+    <rect x="0.5" y="6" width="2" height="2"/>
+    <rect x="13.5" y="6" width="2" height="2"/>
+  </g>
+  <!-- X 眼 -->
+  <g fill="#000000">
+    <rect x="4.5" y="5" width="1" height="1"/>
+    <rect x="10.5" y="5" width="1" height="1"/>
+    <rect x="3.5" y="4" width="1" height="1"/>
+    <rect x="5.5" y="4" width="1" height="1"/>
+    <rect x="3.5" y="6" width="1" height="1"/>
+    <rect x="5.5" y="6" width="1" height="1"/>
+    <rect x="9.5" y="4" width="1" height="1"/>
+    <rect x="11.5" y="4" width="1" height="1"/>
+    <rect x="9.5" y="6" width="1" height="1"/>
+    <rect x="11.5" y="6" width="1" height="1"/>
+  </g>
+</svg>

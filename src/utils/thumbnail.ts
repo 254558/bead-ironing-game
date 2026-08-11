@@ -42,8 +42,11 @@ export function renderThumb(
     for (let c = minC; c <= maxC; c++) {
       const cell = grid[r][c]
       if (!cell.color) continue
-      const cx = (c - minC + 0.5) * scale
-      const cy = (r - minR + 0.5) * scale
+      // 行列都取反向，与主画布初始视角一致（yaw=π、相机在 -Z 侧无 X 偏移时，
+      // 屏幕左上角 = grid 最大行×最大列，恰与导入图片的正常方向相同）：
+      // 缩略图把 grid 第 0 行画在底部、第 0 列画在右，避免保存弹框里看起来颠倒/镜像
+      const cx = (maxC - c + 0.5) * scale
+      const cy = (maxR - r + 0.5) * scale
       const m = cell.melt
       let color = cell.color
       if (m > 0.85) color = shade(color, -0.5)
