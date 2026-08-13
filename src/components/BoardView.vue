@@ -22,19 +22,11 @@ watch(
   },
 )
 
-// 网格内容变化（放豆/擦除/导入/清空/载入/熔融复位）→ 下一帧合并重建珠子实例。
+// 网格内容变化（放豆/擦除/导入/清空/载入）→ 下一帧合并重建珠子实例。
 // 拖拽连续放豆时每个 pointermove 都递增 gridVersion，requestRebuild 按帧去重，避免每 move 全量重建
 watch(
   () => store.gridVersion,
   () => board?.requestRebuild(),
-)
-
-// 熔融批量复位（熨烫后切回设计）→ 立即同步重建珠子层。
-// 若也走 rAF 延迟重建，下一帧棋盘线已恢复显示、珠子却仍是熔融后的浅色连片
-// （视觉上像一层白雾盖在棋盘上）；同步重建保证棋盘可见的第一帧就是空心珠
-watch(
-  () => store.meltResetTick,
-  () => board?.rebuildNow(),
 )
 
 // 图纸层变化（导入/清空/载入）→ 仅重建图纸实例，不动珠子层
@@ -54,6 +46,9 @@ onMounted(() => {
     // createThreeBoard 内部已做初始 resize + rebuild（已有内容也一并渲染），
     // 此处不再二次 rebuild；后续 resizeTick/gridVersion/patternVersion 变化由上方 watch 接管
     board = createThreeBoard(wrap.value)
+    // 载入即熨烫模式（autosave 恢复）时也启动熔融循环：watch 只在模式变化时触发，
+    // 页面加载时若已是 ironing 模式则永不启动，熨烫会一直无效
+    if (store.mode === 'ironing') startIronLoop()
   }
 })
 

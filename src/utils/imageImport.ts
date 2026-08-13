@@ -346,6 +346,9 @@ function importGridBeads(img: HTMLImageElement): boolean {
       const hex = repHex[keyToCluster.get(key)!]
       store.grid[gr][gc].pixel = hex
       store.grid[gr][gc].color = hex
+      // 豆子为空心圆柱（与手动放豆一致），从 melt=0 开始：颜色与熔融解耦，
+      // 顶环无光照渲染色=图纸色，不会随熨烫变暗；熨烫压扁、孔闭合后颜色不变，
+      // 无需靠熨烫「找颜色」
     }
   }
 
@@ -353,7 +356,7 @@ function importGridBeads(img: HTMLImageElement): boolean {
   store.gridVersion++ // 图纸写入完成，通知画布静态层缓存失效
   store.patternVersion++ // 图纸层重写，通知画布重建图纸实例
   store.fitViewTick++ // 导入完成，通知 3D 自动适配视角（整个棋盘入镜）
-  showStatus(`已从图纸生成 ${nx}×${ny} 豆子，按住拖动熨烫`)
+  showStatus(`已从图纸生成 ${nx}×${ny} 豆子，颜色与图纸一致，可熨烫压平`)
   return true
 }
 
@@ -407,8 +410,11 @@ export function importImage(file: File, mode: ImportMode) {
         if (data[i + 3] < 128) continue
         const best = nearestColor(data[i], data[i + 1], data[i + 2])
         store.grid[gr][gc].pixel = COLORS[best]
-        // 直接变豆子：自动铺好色块，导入完只需熨烫
-        if (mode === 'beads') store.grid[gr][gc].color = COLORS[best]
+        // 直接变豆子：自动铺好色块；豆子为空心圆柱（与手动放豆一致），顶环
+        // 无光照渲染色=图纸色，熨烫压扁后颜色不变（颜色与熔融解耦）
+        if (mode === 'beads') {
+          store.grid[gr][gc].color = COLORS[best]
+        }
       }
     }
 
@@ -418,7 +424,7 @@ export function importImage(file: File, mode: ImportMode) {
     store.fitViewTick++ // 导入完成，通知 3D 自动适配视角（整个棋盘入镜）
     showStatus(
       mode === 'beads'
-        ? '豆子已自动铺好，按住拖动熨烫'
+        ? '豆子已自动铺好，颜色与图纸一致，可熨烫压平'
         : '导入完成：拼豆图纸，可对照放豆',
     )
     URL.revokeObjectURL(url)

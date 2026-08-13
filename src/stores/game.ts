@@ -24,10 +24,6 @@ export const store = reactive({
   grid: markRaw(createGrid(40, 40)) as Cell[][],
   /** 网格内容版本号：任何珠子/图纸变更时 +1，供画布静态层缓存失效检测 */
   gridVersion: 0,
-  /** 熔融批量复位版本号：切回设计模式复位全部熔融时 +1。
-   *  与 gridVersion 分开：熔融复位后珠子实例必须立即同步重建（rAF 延迟会有一帧
-   *  白雾残留），普通放豆/擦除/扩容仍走按帧合并的延迟重建 */
-  meltResetTick: 0,
   /** 图纸（pixel 层）版本号：仅导入/清空/载入时 +1。
    *  与 gridVersion 分开：放豆/擦除只改珠子层，不必重建图纸实例 */
   patternVersion: 0,
@@ -146,14 +142,7 @@ export function placeBead(x: number, y: number) {
     return
   }
   const target = store.grid[cell.r][cell.c]
-  if (target.color === store.selectedColor) {
-    // 同色豆被烫过（melt>0）：放豆重置熔融——让「放豆」能修复烫糊的珠子
-    if (target.melt !== 0) {
-      target.melt = 0
-      store.gridVersion++
-    }
-    return
-  }
+  if (target.color === store.selectedColor) return
   target.color = store.selectedColor
   target.melt = 0
   store.gridVersion++
@@ -180,23 +169,12 @@ export function switchMode(m: Mode) {
   store.mode = m
   // 视角工具只在设计模式使用，切走时关闭
   if (m !== 'design') store.viewMode = false
-  // 切回设计模式：全部珠子恢复未熔融；若在视角调整中，点「设计」退出视角工具（视角自动归中到画布）
+  // 熔融状态在模式间保持（颜色与熔融解耦后无需复位）：切回设计只处理视角工具退出与画布归中
   let msg = '点击/拖拽放置拼豆'
   if (m === 'design') {
     if (store.viewMode) {
       store.viewMode = false
       msg = '回到设计：画布已居中'
-    }
-    let touched = false
-    for (const row of store.grid)
-      for (const cell of row)
-        if (cell.melt > 0) {
-          cell.melt = 0
-          touched = true
-        }
-    if (touched) {
-      store.gridVersion++
-      store.meltResetTick++
     }
   } else {
     msg = '按住拖动来熨烫'
