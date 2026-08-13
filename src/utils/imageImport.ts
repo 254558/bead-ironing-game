@@ -13,13 +13,55 @@ import type { ImportMode } from '../types'
 /** 网格线行：平均灰度比前后行显著更暗（网格线比格子深；阈值取小，靠下方均匀性校验兜底） */
 const LINE_DARK_DIFF = 5
 
-/** 调色板最近色（加权 RGB 距离） */
+/** sRGB 转 Oklab（感知均匀色空间，用于修正加权 RGB 无法区分的同明度不同色相） */
+function srgbToLinear(c: number): number {
+  c /= 255
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+}
+function oklab(r: number, g: number, b: number): [number, number, number] {
+  const R = srgbToLinear(r)
+  const G = srgbToLinear(g)
+  const B = srgbToLinear(b)
+  const l = 0.4122214708 * R + 0.5363325363 * G + 0.0514459929 * B
+  const m = 0.2119034982 * R + 0.6806995451 * G + 0.1073969566 * B
+  const s = 0.0883024619 * R + 0.2817188376 * G + 0.6299787005 * B
+  const l_ = Math.cbrt(l)
+  const m_ = Math.cbrt(m)
+  const s_ = Math.cbrt(s)
+  return [
+    0.2104542553 * l_ + 0.793617785 * m_ - 0.0040720468 * s_,
+    1.9779984951 * l_ - 2.428592205 * m_ + 0.4505937099 * s_,
+    0.0259040371 * l_ + 0.7827717662 * m_ - 0.808675766 * s_,
+  ]
+}
+const COLORS_OK = COLORS_RGB.map(([r, g, b]) => oklab(r, g, b))
+
+/**
+ * 调色板最近色。混合量化：
+ * - 明度 L < 0.25 的极暗格退回加权 RGB（暗端调色板只有黑 #16 与藏青 #0，Oklab 的暗部压缩
+ *   会把近黑 (9,7,5) 误判成藏青），保证黑色仍然是黑色；
+ * - 其余用 Oklab 感知距离，修正加权 RGB 把绿认成灰/蓝、棕认成红等色相偏差。
+ */
 function nearestColor(cr: number, cg: number, cb: number): number {
+  const cl = oklab(cr, cg, cb)
+  if (cl[0] < 0.25) {
+    let best = 0
+    let bd = Infinity
+    for (let k = 0; k < COLORS_RGB.length; k++) {
+      const [pr, pg, pb] = COLORS_RGB[k]
+      const d = 0.3 * (cr - pr) ** 2 + 0.59 * (cg - pg) ** 2 + 0.11 * (cb - pb) ** 2
+      if (d < bd) {
+        bd = d
+        best = k
+      }
+    }
+    return best
+  }
   let best = 0
   let bd = Infinity
-  for (let k = 0; k < COLORS_RGB.length; k++) {
-    const [pr, pg, pb] = COLORS_RGB[k]
-    const d = 0.3 * (cr - pr) ** 2 + 0.59 * (cg - pg) ** 2 + 0.11 * (cb - pb) ** 2
+  for (let k = 0; k < COLORS_OK.length; k++) {
+    const [pl, pa, pb] = COLORS_OK[k]
+    const d = (cl[0] - pl) ** 2 + (cl[1] - pa) ** 2 + (cl[2] - pb) ** 2
     if (d < bd) {
       bd = d
       best = k
