@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { eraseCell, expandGridKeep, getCellAt, MAX_GRID, placeBead, store } from '../stores/game'
-import { BURN, CELL, DISPLAY_CELL, FUSE_MAX, FUSE_SEALED, IRON_RADIUS, beadHash } from '../utils/color'
+import { CELL, DISPLAY_CELL, FUSE_SEALED, IRON_RADIUS, beadHash } from '../utils/color'
 import {
   BEAD_HEIGHT,
   BEAD_SCALE,
@@ -24,8 +24,6 @@ export interface ThreeBoardHandle {
   requestRebuildPattern(): void
   /** 同步立即重建珠子与图纸实例（初始渲染等不能延迟的场景） */
   rebuild(): void
-  /** 同步立即重建珠子层（熔融批量复位后必须立刻反映，rAF 延迟会残留一帧熔融连片） */
-  rebuildNow(): void
   /** 视角适配：把画布整体居中收进视口（初始渲染 / 切回设计模式时调用） */
   fitView(): void
   dispose(): void
@@ -448,13 +446,12 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     const q = scratchQuat
     const m4 = scratchMatrix
     if (mesh === filledMesh || mesh === fusedMesh) {
-      // 熔融/完全熔融：圆角矩形压扁形态，随机轴向略微拉伸模拟融合方向
+      // 熔融/完全熔融：圆角矩形压扁形态，随机轴向略微拉伸模拟融合方向。
+      // 颜色与熔融解耦：任何熔融程度颜色恒等于豆子原色（= 图纸色），只压扁不压暗、不烫糊
       const bh2 = beadHash(r, c)
       const ax = 0.94 + bh2 * 0.12
       const az = 0.94 + (1 - bh2) * 0.12
       sc.set(rad * ax, h, rad * az)
-      if (melt > BURN) col.multiplyScalar(0.35)
-      else if (melt > FUSE_MAX) col.multiplyScalar(0.78)
     } else {
       sc.set(rad, h, rad)
     }
@@ -473,8 +470,8 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   }
 
   /** 全量重建珠子实例（放豆/擦除/导入/载入/熔融跨形态边界时调用）。
-   *  三形态：未熔融空心珠（<FILL_MELT）→ 熔融扁珠带残留孔（FILL_MELT~FUSE_SEALED）→ 完全熔融无孔（≥FUSE_SEALED，
-   *  烫到「刚好」容错区间即无孔，直到烫糊前都保持闭合） */
+   *  三形态：未熔融空心珠（<FILL_MELT）→ 熔融扁珠带残留孔（FILL_MELT~FUSE_SEALED）→ 完全熔融无孔（≥FUSE_SEALED）。
+   *  颜色与熔融解耦：任何形态下豆子颜色恒等于原色，熔融只改变几何形态（压扁/扩宽/闭合孔洞） */
   function buildBeadInstances() {
     const hollow: { r: number; c: number; m: number }[] = []
     const filled: { r: number; c: number; m: number }[] = []
@@ -837,18 +834,6 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   let rebuildPending = false
   let rebuildRaf = 0
 
-  /** 同步重建珠子层（不重建图纸层）。用于切回设计模式这类需要“下一帧渲染时已是最新”的场景：
-   *  熔融复位走 rAF 延迟重建时，棋盘线已先恢复显示、珠子却还是熔融后的浅色连片，
-   *  会有一帧“白雾盖在棋盘上”的残留。同步重建后下一帧渲染到的就是空心珠，杜绝该残留帧 */
-  function rebuildNow() {
-    if (rebuildPending) {
-      cancelAnimationFrame(rebuildRaf)
-      rebuildPending = false
-    }
-    buildBeadInstances()
-    markRender()
-  }
-
   /** 珠子层内容变化（放豆/擦除/导入/清空/载入/熔融跨形态边界）→ 下一帧合并重建珠子实例（不重建图纸层：
    *  放豆/擦除不会改变 pixel 层，图纸实例无需动）。
    *  同一帧内多次触发只重建一次：拖拽放豆/6×6 擦除每个 pointermove 都可能触发 gridVersion++，
@@ -960,7 +945,6 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     requestRebuild,
     requestRebuildPattern,
     rebuild,
-    rebuildNow,
     fitView: fitViewToBoard,
     dispose,
   }

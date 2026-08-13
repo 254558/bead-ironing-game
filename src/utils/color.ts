@@ -3,11 +3,8 @@ export const CELL = 14
 export const DISPLAY_CELL = 36
 /** 熨烫半径（×14 单位 ≈ 格数）：≈7 格，以熨斗图标中心为圆心，覆盖约 15×15 格 */
 export const IRON_RADIUS = 98
-export const FUSE_MAX = 0.7
-/** 孔洞完全闭合的熔融下限：烫到此处起珠子无孔，保持到烫糊前（「刚好」容错区间） */
+/** 孔洞完全闭合的熔融下限：烫到此处起珠子无孔（「刚好」状态；颜色不随熔融变化） */
 export const FUSE_SEALED = 0.5
-/** 豆子烫糊阈值：烫过此值视为烫糊，珠子整体压暗 */
-export const BURN = 0.85
 export const IRON_SPEED = 1.0
 /** 图片导入后图案最长边（格数）：画布固定 40×40，图案最长边不超过画布，居中写入 */
 export const MAX_PIX = 40

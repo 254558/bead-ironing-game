@@ -104,7 +104,7 @@ export function createFilledBeadGeometry(): THREE.ExtrudeGeometry {
 }
 
 /**
- * 完全熔融扁珠几何体：圆角矩形拉伸，无孔——熨烫到位（FUSE_MAX）后孔洞完全闭合，
+ * 完全熔融扁珠几何体：圆角矩形拉伸，无孔——熔融达到 FUSE_SEALED 后孔洞完全闭合，
  * 表面不再有凹点。轮廓与 filled 相同，仅去掉残留孔（侧壁单一材质，无需拆组）。
  */
 export function createFusedBeadGeometry(): THREE.ExtrudeGeometry {
@@ -129,91 +129,6 @@ export function createFusedBeadGeometry(): THREE.ExtrudeGeometry {
   geo.center()
   geo.rotateX(Math.PI / 2)
   return geo
-}
-
-/**
- * EVA 表面粗糙度噪声贴图（程序化 value noise，乘法工作流）：
- * base roughness 恒为 1，贴图 green 通道直接承载最终粗糙度——
- * 模拟注塑细微纹理，避免纯色材质在环境高光下显得"死板"。
- * - hollow（未熨烫）：0.70 ± 0.05 均匀波动（EVA 原生哑光，高光大而虚）
- * - filled（熨烫后）：0.62–0.68 为主，随机熔接斑块局部降到 0.45–0.55（略光滑、轻微发亮）
- */
-function createRoughnessMap(opts: { center: number; spread: number; glossySpots?: boolean }): THREE.CanvasTexture {
-  const SIZE = 128
-  const G = 8 // 低分辨率随机网格 + 双线性插值 → 平滑噪声
-  const grid = new Float32Array((G + 1) * (G + 1))
-  for (let i = 0; i < grid.length; i++) grid[i] = Math.random()
-  const smooth = (t: number) => t * t * (3 - 2 * t)
-  const canvas = document.createElement('canvas')
-  canvas.width = SIZE
-  canvas.height = SIZE
-  const ctx = canvas.getContext('2d')!
-  const img = ctx.createImageData(SIZE, SIZE)
-  for (let y = 0; y < SIZE; y++) {
-    for (let x = 0; x < SIZE; x++) {
-      const gx = (x / SIZE) * G
-      const gy = (y / SIZE) * G
-      const x0 = Math.floor(gx)
-      const y0 = Math.floor(gy)
-      const fx = smooth(gx - x0)
-      const fy = smooth(gy - y0)
-      const v =
-        (grid[y0 * (G + 1) + x0] * (1 - fx) + grid[y0 * (G + 1) + x0 + 1] * fx) * (1 - fy) +
-        (grid[(y0 + 1) * (G + 1) + x0] * (1 - fx) + grid[(y0 + 1) * (G + 1) + x0 + 1] * fx) * fy
-      const r = opts.center + (v - 0.5) * 2 * opts.spread
-      const g = Math.round(Math.max(0, Math.min(1, r)) * 255)
-      const i = (y * SIZE + x) * 4
-      img.data[i] = g
-      img.data[i + 1] = g
-      img.data[i + 2] = g
-      img.data[i + 3] = 255
-    }
-  }
-  ctx.putImageData(img, 0, 0)
-  // 熨烫后：随机熔接斑块略微变光滑（粗糙度 0.45–0.55，即比基础 0.65 更暗）
-  if (opts.glossySpots) {
-    const baseG = Math.round(opts.center * 255)
-    const spots = 6
-    for (let s = 0; s < spots; s++) {
-      const cx = Math.random() * SIZE
-      const cy = Math.random() * SIZE
-      const r = 8 + Math.random() * 14
-      const col = Math.round((0.45 + Math.random() * 0.1) * 255)
-      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r)
-      grad.addColorStop(0, `rgb(${col},${col},${col})`)
-      grad.addColorStop(1, `rgba(${baseG},${baseG},${baseG},0)`)
-      ctx.fillStyle = grad
-      ctx.beginPath()
-      ctx.arc(cx, cy, r, 0, Math.PI * 2)
-      ctx.fill()
-    }
-  }
-  const tex = new THREE.CanvasTexture(canvas)
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping
-  tex.repeat.set(4, 4) // 单颗豆表面多次周期，弱化跨豆纹理重复感
-  return tex
-}
-
-/**
- * 豆子顶/底面（cap）材质：哑光、颜色高饱和。
- * 俯视视角下豆子顶部是第一印象——顶层按 EVA 规范做哑光（hollow 0.70±0.04、
- * filled 0.62±0.04 + 局部熔接亮斑），且几乎不吃环境高光（env 0.12、无清漆层）：
- * Neutral 色调映射在 peak>0.76 时会压缩并去饱和，顶部混入白色高光会把颜色冲淡。
- */
-function createEvaCapMaterial(opts: { glossySpots: boolean }): THREE.MeshPhysicalMaterial {
-  return new THREE.MeshPhysicalMaterial({
-    roughness: 1, // 乘法工作流：实际值由 roughnessMap 承载
-    roughnessMap: createRoughnessMap(
-      opts.glossySpots
-        ? { center: 0.62, spread: 0.04, glossySpots: true }
-        : { center: 0.7, spread: 0.04 },
-    ),
-    metalness: 0,
-    clearcoat: 0,
-    // transmission 归零：不透明 EVA 材质无可感知透射，>0 会让 three 额外跑透射 pass（纯成本）
-    envMapIntensity: 0.12,
-    specularIntensity: 0.2,
-  })
 }
 
 /**
@@ -254,21 +169,28 @@ function createEvaInnerMaterial(): THREE.MeshPhysicalMaterial {
 }
 
 /**
- * 空心珠材质组：[0]=cap 顶/底面（哑光高饱和）、[1]=外壁（清漆反光）、[2]=孔内壁（哑光）。
+ * 空心珠材质组：[0]=cap 顶/底面（无光照：顶环渲染色=豆子原色/图纸色，所见即所得）、
+ * [1]=外壁（清漆反光，立体感来源）、[2]=孔内壁（哑光压暗，模拟孔洞阴影）。
  * ExtrudeGeometry 的 material groups 与之对应（group 0 = 上下 cap，group 1/2 = 外/内壁）。
  */
 export function createEvaHollowMaterials(): THREE.Material[] {
   return [
-    createEvaCapMaterial({ glossySpots: false }),
+    new THREE.MeshBasicMaterial(),
     createEvaSideMaterial({ glossy: false }),
     createEvaInnerMaterial(),
   ]
 }
 
-/** 熔融扁珠材质组：顶面带熔接亮斑，侧面比原生豆更光滑 */
+/**
+ * 熔融扁珠材质组：顶面用无光照 MeshBasicMaterial（instanceColor 直接渲染 = 豆子原色/图纸色）。
+ * 扁平的顶面整片朝上，MeshPhysical 的漫反射（0.9 主光 + 0.2 环境 + 补光 ≈ 1.0+）会把亮色通道
+ * 顶到 255 裁剪、环境高光再蒙一层白——整体过曝发白、颜色发糊（旧空心珠顶面是弧面，光照分散
+ * 不裁剪；全板熨平后整片平面累积成"过曝"）。无光照顶面 = 所见即所得，颜色恒等于图纸原色。
+ * 侧面仍是清漆塑料材质（立体感由侧面反光 + 地面投影 + 透视角度提供），空心珠保持物理受光不变。
+ */
 export function createEvaFilledMaterials(): THREE.Material[] {
   return [
-    createEvaCapMaterial({ glossySpots: true }),
+    new THREE.MeshBasicMaterial(),
     createEvaSideMaterial({ glossy: true }),
     createEvaInnerMaterial(),
   ]
