@@ -141,12 +141,12 @@ export function createFusedBeadGeometry(): THREE.ExtrudeGeometry {
  */
 function createEvaSideMaterial(opts: { glossy: boolean }): THREE.MeshPhysicalMaterial {
   return new THREE.MeshPhysicalMaterial({
-    roughness: opts.glossy ? 0.5 : 0.6,
+    roughness: opts.glossy ? 0.55 : 0.65,
     metalness: 0,
-    clearcoat: opts.glossy ? 0.35 : 0.25,
-    clearcoatRoughness: 0.3,
-    envMapIntensity: opts.glossy ? 0.55 : 0.4,
-    specularIntensity: 0.6,
+    clearcoat: opts.glossy ? 0.2 : 0.12,
+    clearcoatRoughness: 0.35,
+    envMapIntensity: opts.glossy ? 0.3 : 0.2,
+    specularIntensity: 0.5,
   })
 }
 
