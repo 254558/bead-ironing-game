@@ -229,8 +229,10 @@ function createEvaSideMaterial(opts: { glossy: boolean }): THREE.MeshPhysicalMat
     clearcoat: 0.7,
     clearcoatRoughness: 0.14,
     // transmission 归零：同 cap 材质——不透明 EVA 不跑透射 pass
-    envMapIntensity: 2.2,
-    specularIntensity: 1.5,
+    // NoToneMapping 下环境高光不再被 tone map 压缩，强度需比 Neutral 时低：
+    // 2.2 的 env 会把俯视时的外壁窄环过曝成一圈白色眩光，降到 1.1 仍有清晰塑料反光
+    envMapIntensity: 1.1,
+    specularIntensity: 0.8,
   })
 }
 

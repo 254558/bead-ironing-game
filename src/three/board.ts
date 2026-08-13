@@ -72,8 +72,11 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
   // pixelRatio 上限 1.5：retina 下帧缓冲像素减少约 44%，画面略软但高帧率更稳
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5))
-  // Neutral tone mapping：相比 ACES 不压缩高饱和色，拼豆颜色更浓郁
-  renderer.toneMapping = THREE.NeutralToneMapping
+  // 不做色调映射（NoToneMapping）：图纸颜色要 1:1 还原，任何 tone map 曲线（Neutral/ACES）
+  // 都会把 >0.76 的高光输入压缩/去饱和——白色豆子光照总量 1.2 会被压成 214 的灰，
+  // 白色/浅色图纸（如白底卡牌）整体发灰。线性输出下白色豆子顶面光照 ≥1 即纯白，
+  // 彩色豆按通道等比变亮（色相不变），深色豆仍是深色。立体感由光照明暗（漫反射）单独提供
+  renderer.toneMapping = THREE.NoToneMapping
   renderer.toneMappingExposure = 1.0
   renderer.shadowMap.enabled = true
   renderer.shadowMap.type = THREE.PCFSoftShadowMap
@@ -88,12 +91,13 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   controls.dampingFactor = 0.08
 
   // 光照：房间环境贴图（侧面高光的来源）+ 低环境光 + 主光（阴影）+ 补光（暗面细节）。
-  // 直射光只影响漫反射：顶部漫反射峰值必须 < 0.76（Neutral 色调映射的压缩起点），
-  // 否则红色通道被压缩/去饱和，颜色发白。侧面的清漆高光由 envMap 独立提供，不受影响。
+  // NoToneMapping 线性输出：主光 0.9 + 环境 0.2 = 白色豆子顶面 ≈1.1 → 纯白（不超太多，
+  // 避免彩豆过亮）；黑豆 albedo=0 任何光都不贡献 → 保持黑；彩豆按通道等比 +10% 微亮。
+  // 侧面的清漆高光由 envMap 独立提供（材质侧强度已调低防眩光白环）。
   const pmrem = new THREE.PMREMGenerator(renderer)
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
-  scene.add(new THREE.AmbientLight(0xffffff, 0.18))
-  const key = new THREE.DirectionalLight(0xffffff, 1.05)
+  scene.add(new THREE.AmbientLight(0xffffff, 0.2))
+  const key = new THREE.DirectionalLight(0xffffff, 0.9)
   scene.add(key)
   scene.add(key.target) // 阴影相机跟随注视中心，无限画布平移后阴影不丢
   key.castShadow = true
