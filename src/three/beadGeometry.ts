@@ -155,17 +155,12 @@ function createEvaSideMaterial(opts: { glossy: boolean }): THREE.MeshPhysicalMat
  * 豆子孔内壁材质：哑光、整体压暗（假 AO 模拟孔洞内部阴影）。
  * 俯视透过珠孔看到的应是暗色腔体而不是反光——内壁不再用外壁的清漆材质。
  * 颜色系数乘 instanceColor 一起参与漫反射，孔内壁呈现"变暗的豆色"。
+ * 用无光照 MeshBasicMaterial：MeshPhysical 的内壁受环境贴图（envMapIntensity>0）影响，
+ * 翻到板底看孔隧道时，内壁明暗随视角连续变化，图案上出现"细微波动"；
+ * 无光照后内壁恒色，任意视角下孔的颜色/明暗都不再变化。
  */
-function createEvaInnerMaterial(): THREE.MeshPhysicalMaterial {
-  return new THREE.MeshPhysicalMaterial({
-    color: 0x6f6f6f,
-    roughness: 0.9,
-    metalness: 0,
-    clearcoat: 0,
-    transmission: 0,
-    envMapIntensity: 0.15,
-    specularIntensity: 0.2,
-  })
+function createEvaInnerMaterial(): THREE.Material {
+  return new THREE.MeshBasicMaterial({ color: 0x6f6f6f })
 }
 
 /**
