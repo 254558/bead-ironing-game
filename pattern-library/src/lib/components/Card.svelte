@@ -204,9 +204,11 @@
   const popover = () => {
     const rect = thisCard.getBoundingClientRect(); // get element's size/position
     let delay = 100;
+    // 展开到窗口宽的 90%、高的 72%（留出底部「导入」按钮空间）；
+    // 一行 10 个布局下卡片很小，上限放宽到 12 倍，让展开的卡牌足够大能看到全息效果
     let scaleW = (window.innerWidth / rect.width) * 0.9;
-    let scaleH = (window.innerHeight / rect.height) * 0.9;
-    let scaleF = 1.75;
+    let scaleH = (window.innerHeight / rect.height) * 0.72;
+    let scaleF = 12;
     setCenter();
     if (firstPop) {
       delay = 1000;
@@ -364,6 +366,7 @@
   class:interacting
   class:loading
   class:masked={!!mask}
+  data-id={id}
   data-number={number}
   data-set={set}
   data-subtypes={subtypes}

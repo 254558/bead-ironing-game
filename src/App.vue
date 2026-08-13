@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { defineAsyncComponent } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import CardsView from './components/CardsView.vue'
 import ColorWheelPanel from './components/ColorWheelPanel.vue'
 import Stage from './components/Stage.vue'
 import ToolPanel from './components/ToolPanel.vue'
 import { store } from './stores/game'
 
-// 导入对话框 / 图纸选择器：点开才下载对应代码（含图片识别逻辑），减小首屏 JS
-const ImportDialog = defineAsyncComponent(() => import('./components/ImportDialog.vue'))
+// 图纸选择器：点开才下载对应代码（含图片识别逻辑），减小首屏 JS
 const PatternPicker = defineAsyncComponent(() => import('./components/PatternPicker.vue'))
+
+/** 取色器（右侧颜色轮）仅在「设计」模式出现；熨烫/视角工具时滑走隐藏 */
+const showColorWheel = computed(() => store.mode === 'design' && !store.viewMode)
 </script>
 
 <template>
@@ -19,10 +21,11 @@ const PatternPicker = defineAsyncComponent(() => import('./components/PatternPic
       <ToolPanel />
     </aside>
     <Stage />
-    <aside class="sidebar sidebar-right">
-      <ColorWheelPanel />
-    </aside>
-    <ImportDialog v-if="store.showImportDialog" />
+    <Transition name="wheel-slide">
+      <aside v-show="showColorWheel" class="sidebar sidebar-right">
+        <ColorWheelPanel />
+      </aside>
+    </Transition>
     <PatternPicker v-if="store.showPatternPicker" />
     <CardsView v-if="store.cardsView" />
   </div>

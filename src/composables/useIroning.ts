@@ -1,4 +1,4 @@
-import { markDirty, store } from '../stores/game'
+import { store } from '../stores/game'
 import { CELL, IRON_RADIUS, IRON_SPEED } from '../utils/color'
 
 /**
@@ -25,7 +25,6 @@ export function useIroning(render: () => void) {
       const c1 = Math.min(store.cols - 1, Math.ceil(store.iron.x / CELL + rad))
       const r0 = Math.max(0, Math.floor(store.iron.y / CELL - rad))
       const r1 = Math.min(store.rows - 1, Math.ceil(store.iron.y / CELL + rad))
-      let wrote = false
       for (let r = r0; r <= r1; r++) {
         for (let c = c0; c <= c1; c++) {
           const cell = store.grid[r][c]
@@ -39,12 +38,9 @@ export function useIroning(render: () => void) {
           if (d2 < 1) {
             const f = 1 - Math.sqrt(d2)
             cell.melt = Math.min(1, cell.melt + IRON_SPEED * f * dt)
-            wrote = true
           }
         }
       }
-      // 熔融有变化 → 标记内容变脏（供自动保存按需写入）
-      if (wrote) markDirty()
     }
     render()
     raf = requestAnimationFrame(loop)

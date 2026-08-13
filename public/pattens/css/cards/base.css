@@ -53,6 +53,11 @@
   -webkit-transform: translate3d(0px, 0px, 0.01px);
   transform: translate3d(0px, 0px, 0.01px);
   pointer-events: none;
+
+  /* 展开的卡牌用 rotator 宽度放大（见 .card__rotator），内容会超出网格格。
+     min-width: 0 阻止内容把 1fr 轨道撑宽（否则 calc 的 100% 变大 → 反馈循环，
+     轨道被撑到数百 px，整行错位） */
+  min-width: 0;
   
   /* make sure the card is above others if it's scaled up */
   z-index: calc(var(--card-scale) * 2);
@@ -117,7 +122,9 @@
   border-radius: var(--card-radius);
 }
 
-.card.interacting {
+.card.interacting,
+.card.active {
+  /* 展开的卡必须盖在遮罩（z 50）之上：active 卡保持 interacting 前置层级 */
   z-index: calc(var(--card-scale) * 120);
 }
 
@@ -141,17 +148,36 @@
 .card__translater {
   width: auto;
   position: relative;
+  /* 槽位固定为网格基尺寸（95×132）：rotator 绝对定位后不再参与布局，
+     展开放大只是视觉溢出（z-index 盖住其他卡），不会把所在行撑高、
+     把其他卡挤下去 */
+  aspect-ratio: var(--card-aspect);
 
   --translate-z: calc(var(--card-scale) * 150px + 0.01px); /* add 150px to the z-axis to ensure the card is always in front of the others */
-  -webkit-transform: translate3d(var(--translate-x), var(--translate-y), var(--translate-z)) scale(var(--card-scale));
-  transform: translate3d(var(--translate-x), var(--translate-y), var(--translate-z)) scale(var(--card-scale));
+  /* 放大不再用 transform scale()：图层会在 95px（网格尺寸）栅格化后整体放大，图像/全息
+     纹理全部变糊。改为 .card__rotator 宽度按 --card-scale 增长，图层按最终显示尺寸栅格化，
+     图像按显示分辨率从 1024px 源图采样（源图足够，糊在「小图层放大」） */
+  -webkit-transform: translate3d(var(--translate-x), var(--translate-y), var(--translate-z));
+  transform: translate3d(var(--translate-x), var(--translate-y), var(--translate-z));
 }
 
 .card__rotator {
-  -webkit-transform: rotateY(var(--rotate-x)) rotateX(var(--rotate-y));
+  /* 脱离网格流：绝对定位于槽位中心（translater 为 relative 包含块），
+     放大时宽度/高度增长只覆盖相邻卡（.card z-index 已置顶），
+     不再撑开槽位 → grid 行高不变，其他卡保持原位 */
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  /* 先平移回中心，再旋转（transform-origin: center） */
+  -webkit-transform: translate(-50%, -50%) rotateY(var(--rotate-x)) rotateX(var(--rotate-y));
+  transform: translate(-50%, -50%) rotateY(var(--rotate-x)) rotateX(var(--rotate-y));
+  /* 放大动画主体：宽度 = 网格基宽 × --card-scale（中心不动），
+     展开时图层以显示尺寸栅格化，卡面/炫彩纹理都不模糊。
+     min-width: 0 防止内容的固有宽度（卡图 1024px）把宽度 calc 抬高 */
+  width: calc(100% * var(--card-scale));
+  min-width: 0;
   -webkit-transform-style: preserve-3d;
   transform-style: preserve-3d;
-  transform: rotateY(var(--rotate-x)) rotateX(var(--rotate-y));
   
   /* performance */
   pointer-events: auto;

@@ -82,12 +82,51 @@ h3 {
   letter-spacing: -2px;
   font-weight: normal;
   color: #fff;
+  transition: opacity 0.3s ease;
+}
+
+/* 卡牌展开时标题（Back + 编号）变暗：与网格遮罩呼应，突出放大的卡和 import；
+   import 按钮在 meta 里不受影响，保持高亮 */
+.ship-section__head.dimmed .ship-section__title {
+  opacity: 0.35;
 }
 
 .ship-section__title-row {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
+}
+
+/* 标题里的 Back：作为返回主界面的入口，继承像素大标题样式，hover 变黄提示可点 */
+.ship-section__title-row .back-title {
+  border: 0;
+  background: none;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: none;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  transition: color 0.3s ease;
+  /* 点击聚焦/选中时不留痕迹：去掉 focus 圈、禁止文字被选中（否则双击/拖拽会选中
+     Back 文字，出现选中高亮 + 闪烁的文本插入竖线）、caret 透明 */
+  outline: none;
+  -webkit-user-select: none;
+  user-select: none;
+  caret-color: transparent;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ship-section__title-row .back-title:focus,
+.ship-section__title-row .back-title:focus-visible {
+  outline: none;
+}
+
+.ship-section__title-row .back-title:hover {
+  color: #ffd54a;
 }
 
 /* 像素字体的字形带内边距，方框微调对齐文字视觉中心 */
@@ -124,6 +163,31 @@ h3 {
 .ship-section__back:hover {
   color: #ffd54a;
   text-decoration: underline;
+}
+
+/* 卡牌展开后「import」高亮：品牌橙 + 发光 + 呼吸闪烁，
+   提示用户点这里可以把当前展开的图纸导入游戏 */
+.ship-section__back.importable {
+  color: #ef7d57;
+  font-weight: 700;
+  text-decoration: underline;
+  text-shadow: 0 0 10px rgba(239, 125, 87, 0.7);
+  animation: import-pulse 0.6s ease-in-out infinite;
+}
+
+.ship-section__back.importable:hover {
+  color: #ff9d7c;
+  text-shadow: 0 0 14px rgba(239, 125, 87, 0.9);
+}
+
+@keyframes import-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
 }
 
 @media screen and (max-width: 600px) {

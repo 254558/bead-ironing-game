@@ -39,7 +39,7 @@ watch(
 
 onMounted(() => {
   if (wrap.value) {
-    // createThreeBoard 内部已做初始 resize + rebuild（autosave 恢复的作品也一并渲染），
+    // createThreeBoard 内部已做初始 resize + rebuild（已有内容也一并渲染），
     // 此处不再二次 rebuild；后续 resizeTick/gridVersion/patternVersion 变化由上方 watch 接管
     board = createThreeBoard(wrap.value)
   }

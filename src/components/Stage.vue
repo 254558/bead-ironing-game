@@ -1,11 +1,8 @@
 <script setup lang="ts">
-import { defineAsyncComponent, onMounted, onUnmounted, useTemplateRef } from 'vue'
-import { setupGrid, showStatus, startAutosave, stopAutosave, store } from '../stores/game'
+import { onMounted, onUnmounted, useTemplateRef } from 'vue'
+import { setupGrid, showStatus, store } from '../stores/game'
 import BoardView from './BoardView.vue'
 import StatusBar from './StatusBar.vue'
-
-// 作品面板：点开才下载，减小首屏 JS
-const SavePanel = defineAsyncComponent(() => import('./SavePanel.vue'))
 
 const root = useTemplateRef<HTMLDivElement>('root')
 let resizeTimer: ReturnType<typeof setTimeout> | undefined
@@ -26,13 +23,11 @@ function onWindowResize() {
 
 onMounted(() => {
   measure()
-  showStatus(store.restoredFromAutosave ? '已自动恢复上次未保存的进度' : '点击/拖拽放置拼豆')
-  startAutosave()
+  showStatus('点击/拖拽放置拼豆')
   window.addEventListener('resize', onWindowResize)
 })
 
 onUnmounted(() => {
-  stopAutosave()
   window.removeEventListener('resize', onWindowResize)
 })
 </script>
@@ -40,7 +35,6 @@ onUnmounted(() => {
 <template>
   <div ref="root" class="canvas-wrap">
     <BoardView />
-    <SavePanel v-if="store.showSavePanel" />
     <StatusBar />
   </div>
 </template>

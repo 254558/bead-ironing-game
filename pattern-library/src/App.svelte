@@ -3,9 +3,13 @@ import CardList from "./Cards.svelte";
 	import Card from "./lib/components/CardProxy.svelte";
 	import ShuffleText from "./lib/components/ShuffleText.svelte";
 	import ShuffleCode from "./lib/components/ShuffleCode.svelte";
+	import { activeCard } from "./lib/stores/activeCard.js";
 	import { CHAR_POOL } from "./lib/shuffle.js";
 
 	let cardCode;
+	// 当前展开卡牌的 id（pattern-01 … pattern-38），未展开为空
+	let activeId = "";
+	$: activeId = $activeCard ? ($activeCard.dataset?.id || "") : "";
 
 	// 由卡片 id 确定性生成三位字母码（同一张卡永远同一个码）
 	function threeLetterCode(id) {
@@ -39,22 +43,46 @@ import CardList from "./Cards.svelte";
 			window.location.href = "../";
 		}
 	}
+
+	// 通知父页面导入当前展开的卡牌图案（等同「从内置图纸选」：自动识别网格铺好豆子）
+	// importLock：同一张卡只发一次导入消息（pointerdown 与 click 可能都触发）
+	let importLock = false;
+	function importActive() {
+		if (importLock || !activeId) return;
+		importLock = true;
+		if (window.parent !== window) {
+			window.parent.postMessage({ type: "bead-import-pattern", id: activeId }, "*");
+		}
+	}
 </script>
 
 <svelte:window on:card-hover={onCardHover} on:card-leave={onCardLeave} />
 
 <main>
 
-		<div class="ship-section__head">
+		<div class="ship-section__head" class:dimmed={activeId}>
 			<h2 class="ship-section__title">
 				<span class="ship-section__title-row">
-					<span>Patterns</span>
+					<!-- 点 Back 返回拼豆主界面 -->
+					<button class="back-title" on:click={backToGame}>
+						<ShuffleText text="Back" />
+					</button>
 					<ShuffleCode bind:this={cardCode} />
 				</span>
 			</h2>
 			<p class="ship-section__meta">
-				<ShuffleText text="Welcome to submit · " />
-				<button class="ship-section__back" on:click={backToGame}>Click patterns to return</button>
+				<!-- 仅展开卡牌时显示「import」（高亮提示可导入）；平时不占位 -->
+				{#if activeId}
+					<!-- pointerdown/mousedown preventDefault：阻止焦点从展开的卡牌转移到本按钮，
+					     否则卡牌 blur 收起、activeId 清空，点击就变成「返回」而不是「导入」 -->
+					<button
+						class="ship-section__back"
+						class:importable={activeId}
+						on:pointerdown|preventDefault
+						on:mousedown|preventDefault
+						on:click={importActive}
+					>import</button>
+				{/if}
 			</p>
 		</div>
 
@@ -447,5 +475,6 @@ import CardList from "./Cards.svelte";
 				supertype="Pokémon"
 				subtypes="Basic"
 			/>
-		</CardList>
-	</main>
+	</CardList>
+</main>
+

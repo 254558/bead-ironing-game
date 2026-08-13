@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, useTemplateRef } from 'vue'
 import { store } from '../stores/game'
 import { importImage } from '../utils/imageImport'
 
@@ -16,9 +16,31 @@ const PATTERNS = [
 ].map((name, i) => ({ name, src: `pattens/patterns/p${String(i + 1).padStart(2, '0')}.webp` }))
 
 const loading = ref('')
+const fileInput = useTemplateRef<HTMLInputElement>('fileInput')
 
 function close() {
   store.showPatternPicker = false
+}
+
+/** 导入本地图片：作为像素参考图（图纸模式），自己在上面对照放豆 */
+function importLocal() {
+  fileInput.value?.click()
+}
+
+/** 打开全息卡牌效果图纸库（原「图纸库」全屏 iframe 参考页） */
+function openCards() {
+  store.showPatternPicker = false
+  store.cardsView = true
+}
+
+function onFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (file) {
+    importImage(file, 'pattern')
+    close()
+  }
+  input.value = ''
 }
 
 /** 点击图纸：拉取内置 webp 当图片文件导入（beads 模式自动识别 40×40 网格放好豆子） */
@@ -50,10 +72,14 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   <div class="pattern-picker" @click.self="close">
     <header class="pattern-picker-head">
       <div>
-        <h3>从内置 38 张图纸选</h3>
-        <p class="pattern-picker-desc">点一张图纸，自动识别 40×40 网格铺好豆子，你只需要熨烫</p>
+        <h3>图纸</h3>
+        <p class="pattern-picker-desc">导入图片当图纸参考对照放豆，或从内置图纸选一张自动铺好豆子</p>
       </div>
-      <button class="pattern-picker-close" @click="close" title="关闭（Esc 也可以）">✕</button>
+      <div class="pattern-picker-actions">
+        <button class="pattern-picker-cards" @click="openCards">全息卡牌效果</button>
+        <button class="pattern-picker-import" @click="importLocal">导入图片</button>
+        <button class="pattern-picker-close" @click="close" title="关闭（Esc 也可以）">✕</button>
+      </div>
     </header>
 
     <div class="pattern-picker-grid">
@@ -70,6 +96,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
       </button>
     </div>
   </div>
+  <input ref="fileInput" type="file" accept="image/*" class="file-input" @change="onFileChange">
 </template>
 
 <style scoped>
@@ -106,6 +133,47 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   font-size: 13px;
 }
 
+.pattern-picker-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+
+.pattern-picker-cards {
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid rgba(122, 178, 255, 0.6);
+  border-radius: 999px;
+  background: rgba(122, 178, 255, 0.1);
+  color: #7ab2ff;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.pattern-picker-cards:hover {
+  background: rgba(122, 178, 255, 0.2);
+  border-color: #7ab2ff;
+}
+
+.pattern-picker-import {
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 213, 74, 0.6);
+  border-radius: 999px;
+  background: rgba(255, 213, 74, 0.12);
+  color: #ffd54a;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.pattern-picker-import:hover {
+  background: rgba(255, 213, 74, 0.22);
+  border-color: #ffd54a;
+}
+
 .pattern-picker-close {
   flex: none;
   width: 36px;
@@ -129,8 +197,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   flex: 1;
   overflow-y: auto;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 12px;
   padding: 4px 4px 12px;
 }
 

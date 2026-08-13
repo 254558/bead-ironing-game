@@ -24,16 +24,3 @@ export interface IronCenter {
   x: number
   y: number
 }
-
-/** 已保存的一幅作品（点「恢复」列表取回，无拖拽/旋转/缩放姿态） */
-export interface SavedBoard {
-  id: string
-  /** 自动生成的作品名，如「作品 1」 */
-  name: string
-  cols: number
-  rows: number
-  grid: Cell[][]
-  /** 缩略图 PNG dataURL（null = 尚未生成，作品列表打开时 ensureBoardThumbs 补齐） */
-  thumb: string | null
-  savedAt: number
-}

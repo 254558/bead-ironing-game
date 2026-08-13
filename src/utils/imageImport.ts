@@ -1,4 +1,4 @@
-import { clearCellContent, expandGrid, markDirty, MAX_GRID, showStatus, store, switchMode } from '../stores/game'
+import { clearCellContent, expandGrid, MAX_GRID, showStatus, store, switchMode } from '../stores/game'
 import { COLORS, COLORS_RGB, MAX_PIX } from '../utils/color'
 import type { ImportMode } from '../types'
 
@@ -248,7 +248,7 @@ function importGridBeads(img: HTMLImageElement): boolean {
   switchMode('ironing')
   store.gridVersion++ // 图纸写入完成，通知画布静态层缓存失效
   store.patternVersion++ // 图纸层重写，通知画布重建图纸实例
-  markDirty()
+  store.fitViewTick++ // 导入完成，通知 3D 自动适配视角（整个棋盘入镜）
   showStatus(`已从图纸生成 ${nx}×${ny} 豆子，按住拖动熨烫`)
   return true
 }
@@ -309,7 +309,7 @@ export function importImage(file: File, mode: ImportMode) {
     switchMode(mode === 'beads' ? 'ironing' : 'design')
     store.gridVersion++ // 图纸写入完成，通知画布静态层缓存失效
     store.patternVersion++ // 图纸层重写，通知画布重建图纸实例
-    markDirty()
+    store.fitViewTick++ // 导入完成，通知 3D 自动适配视角（整个棋盘入镜）
     showStatus(
       mode === 'beads'
         ? '豆子已自动铺好，按住拖动熨烫'

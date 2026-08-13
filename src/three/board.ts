@@ -195,7 +195,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     const t = e.target as HTMLElement | null
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
     if (e.ctrlKey || e.metaKey || e.altKey) return
-    if (store.mode !== 'design' || store.showSavePanel) return
+    if (store.mode !== 'design') return
     const fwd =
       e.code === 'KeyW' || e.code === 'ArrowUp' ? 1 : e.code === 'KeyS' || e.code === 'ArrowDown' ? -1 : 0
     const strafe =
@@ -357,6 +357,66 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     fill.target.position.set(center.x, 0, center.z)
     updateSceneVisibility()
     markRender()
+  }
+
+  /** 导入图纸后自动适配视角：把图纸内容包围盒完整放进视口。
+   *  保持当前 yaw/pitch 不变（尊重用户已选的观察角度），只平移注视中心 + 调整缩放。
+   *  用正确的透视几何求相机距离：以相机距离 r、俯角 pitch、方位 yaw 注视内容中心，
+   *  内容包围盒沿观察方向的深度半跨度 maxS = hw·|sin yaw| + hh·|cos yaw|，
+   *  屏幕横向半跨度 maxLat = hw·|cos yaw| + hh·|sin yaw|；
+   *  离相机最近的近角投影最大——垂直偏移 focal·sp·maxS/(r−cp·maxS)、水平偏移 focal·maxLat/(r−cp·maxS)，
+   *  令两者 ≤ 视口对应边的一半（留 pad 余量）解出所需最小相机距离 r，scale = baseDist / r。
+   *  注意：近角深度是 r−cp·maxS（不是 r−maxS），近行投影会被显著放大，旧公式（×sin(pitch) 均匀压缩）
+   *  低估了距离，导致棋盘底部行被推出视口。 */
+  function fitViewToBoard() {
+    const { w, h } = viewportSize()
+    const pad = 0.9 // 棋盘占视口最大比例
+    // 用图纸内容包围盒（豆子 + 像素参考层）计算，而不是 store.cols/rows：
+    // 网格可能被「视口角落射线」历史扩容撑大（ensureGridFitsViewport 的远处交点），
+    // 若按 cols/rows 适配，scale 会被钳到 MIN_SCALE，豆子反而太小
+    let minR = Infinity, maxR = -1, minC = Infinity, maxC = -1
+    for (let r = 0; r < store.rows; r++) {
+      const row = store.grid[r]
+      for (let c = 0; c < store.cols; c++) {
+        const cell = row[c]
+        if (cell.color || cell.pixel) {
+          if (r < minR) minR = r
+          if (r > maxR) maxR = r
+          if (c < minC) minC = c
+          if (c > maxC) maxC = c
+        }
+      }
+    }
+    let cellsW: number, cellsH: number
+    if (minR === Infinity) {
+      // 空棋盘：按整个网格适配
+      cellsW = Math.max(1, store.cols)
+      cellsH = Math.max(1, store.rows)
+      center.x = cellsW / 2
+      center.z = cellsH / 2
+    } else {
+      cellsW = maxC - minC + 1
+      cellsH = maxR - minR + 1
+      center.x = (minC + maxC + 1) / 2
+      center.z = (minR + maxR + 1) / 2
+    }
+    const hw = cellsW / 2
+    const hh = cellsH / 2
+    const cp = Math.cos(pitch)
+    const sp = Math.max(0.2, Math.abs(Math.sin(pitch)))
+    const tanA = Math.tan(((FOV / 2) * Math.PI) / 180)
+    const sinY = Math.sin(yaw)
+    const cosY = Math.cos(yaw)
+    const maxS = hw * Math.abs(sinY) + hh * Math.abs(cosY)
+    const maxLat = hw * Math.abs(cosY) + hh * Math.abs(sinY)
+    // 近角投影最大：垂直 focal·sp·maxS/(r−cp·maxS) ≤ (h/2)·pad，水平 focal·maxLat/(r−cp·maxS) ≤ (w/2)·pad
+    const focal = (h / 2) / tanA
+    const rVert = maxS * (cp + sp / (tanA * pad))
+    const rHorz = cp * maxS + (focal * maxLat * 2) / (w * pad)
+    scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, baseDist / Math.max(rVert, rHorz)))
+    // 不调 ensureGridFitsViewport：fit 已把图纸整体收进视口，扩网格只会把空行/列
+    // 撑到视口角落的远处交点（把空行/列收进视野会反过来缩小图纸）
+    applyView()
   }
 
   /** 写入单个珠子 instance 的矩阵/颜色（熔融形态公式，按豆子规格缩放）。
@@ -683,9 +743,17 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   }
 
   let raf = 0
+  // 导入触发视角适配的版本记录：fitViewTick 变化 → 下一帧把棋盘整体收进视口
+  let lastFitTick = store.fitViewTick
   function animate() {
     raf = requestAnimationFrame(animate)
     let changed = false
+    // 导入图纸成功（fitViewTick++）→ 自动调整视角，让整个棋盘入镜
+    if (store.fitViewTick !== lastFitTick) {
+      lastFitTick = store.fitViewTick
+      fitViewToBoard()
+      changed = true
+    }
     // 设计模式兜底：若视角仍低于 DESIGN_PITCH_MIN（从背面视角直接切回放豆），抬回安全俯仰角
     if (!store.viewMode && pitch < DESIGN_PITCH_MIN) {
       pitch = DESIGN_PITCH_MIN
