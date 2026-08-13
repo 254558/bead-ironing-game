@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
-import { eraseCell, expandGridKeep, getCellAt, MAX_GRID, placeBead, store } from '../stores/game'
+import { eraseCell, getCellAt, isDesignView, MAX_GRID, placeBead, store } from '../stores/game'
 import { CELL, DISPLAY_CELL, FUSE_SEALED, IRON_RADIUS, beadHash } from '../utils/color'
 import {
   BEAD_HEIGHT,
@@ -234,7 +234,6 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     center.x += (fwd * -Math.sin(yaw) + strafe * Math.cos(yaw)) * step
     center.z += (fwd * -Math.cos(yaw) + strafe * -Math.sin(yaw)) * step
     applyView()
-    ensureGridFitsViewport()
   }
 
   // 视口状态：缩放倍率 + 相机注视的地面中心（世界单位）
@@ -309,20 +308,6 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     return p
   }
 
-  /** 按当前相机可见范围扩容网格（只增不减、保留内容），保证视口内有格子 */
-  function ensureGridFitsViewport() {
-    let maxX = -Infinity
-    let maxZ = -Infinity
-    for (const [nx, ny] of [[-1, -1], [1, -1], [1, 1], [-1, 1]] as const) {
-      const p = groundPoint(nx, ny)
-      if (!p) continue
-      maxX = Math.max(maxX, p.x)
-      maxZ = Math.max(maxZ, p.z)
-    }
-    if (maxX === -Infinity) return
-    expandGridKeep(Math.ceil(maxX) + 2, Math.ceil(maxZ) + 2)
-  }
-
   /** 场景可见性：视角模式隐藏全部平面（地面/网格线/图纸），只看拼豆悬浮，转正面↔背面无任何面挡在中间；
    *  设计模式显示工作台供放豆，网格线再按缩放后每格的显示密度决定。
    *  返回可见性是否变化（供按需渲染判断） */
@@ -393,7 +378,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   function fitViewToBoard() {
     const { w, h } = viewportSize()
     const pad = 0.9 // 棋盘占视口最大比例
-    // 画布固定 40×40（expandGridKeep 恒为 no-op），始终把整块画布居中收进视口：
+    // 画布固定 40×40 不扩容，始终把整块画布居中收进视口：
     // 导入图案已按 offC/offR 居中放在画布中央，按整块画布适配即同时居中图案。
     // 早期按「内容包围盒」适配，是给会被视口角落射线扩容撑大的旧网格打的补丁
     // （网格扩容后按 cols/rows 适配会把 scale 钳到 MIN_SCALE）；网格不再扩容，
@@ -416,8 +401,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     const rVert = maxS * (cp + sp / (tanA * pad))
     const rHorz = cp * maxS + (focal * maxLat * 2) / (w * pad)
     scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, baseDist / Math.max(rVert, rHorz)))
-    // 不调 ensureGridFitsViewport：fit 已把图纸整体收进视口，扩网格只会把空行/列
-    // 撑到视口角落的远处交点（把空行/列收进视野会反过来缩小图纸）
+    // 画布固定 40×40 无需扩容：fit 已把整块画布收进视口，再扩只会把空行/列撑进视野缩小图纸
     applyView()
   }
 
@@ -471,6 +455,26 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     mesh.instanceColor?.dispose()
   }
 
+  /** 构建并添加单个形态的珠子实例网格（登记 beadIndex 供熨烫局部更新，标记缓冲需重传） */
+  function buildBeadMesh(
+    cells: { r: number; c: number; m: number }[],
+    geo: THREE.BufferGeometry,
+    mats: THREE.Material | THREE.Material[],
+  ): THREE.InstancedMesh {
+    const mesh = new THREE.InstancedMesh(geo, mats, Math.max(cells.length, 1))
+    mesh.castShadow = true
+    for (let i = 0; i < cells.length; i++) {
+      const { r, c, m } = cells[i]
+      writeInstance(mesh, i, r, c, m)
+      beadIndex.set(r * MAX_GRID + c, { mesh, idx: i })
+    }
+    mesh.count = cells.length
+    mesh.instanceMatrix.needsUpdate = true
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+    scene.add(mesh)
+    return mesh
+  }
+
   /** 全量重建珠子实例（放豆/擦除/导入/载入/熔融跨形态边界时调用）。
    *  三形态：未熔融空心珠（<FILL_MELT）→ 熔融扁珠带残留孔（FILL_MELT~FUSE_SEALED）→ 完全熔融无孔（≥FUSE_SEALED）。
    *  颜色与熔融解耦：任何形态下豆子颜色恒等于原色，熔融只改变几何形态（压扁/扩宽/闭合孔洞） */
@@ -496,45 +500,9 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     fusedMesh = null
     beadIndex.clear()
 
-    if (hollow.length > 0) {
-      hollowMesh = new THREE.InstancedMesh(hollowGeo, hollowMats, Math.max(hollow.length, 1))
-      hollowMesh.castShadow = true
-      for (let i = 0; i < hollow.length; i++) {
-        const { r, c, m } = hollow[i]
-        writeInstance(hollowMesh, i, r, c, m)
-        beadIndex.set(r * MAX_GRID + c, { mesh: hollowMesh, idx: i })
-      }
-      hollowMesh.count = hollow.length
-      hollowMesh.instanceMatrix.needsUpdate = true
-      if (hollowMesh.instanceColor) hollowMesh.instanceColor.needsUpdate = true
-      scene.add(hollowMesh)
-    }
-    if (filled.length > 0) {
-      filledMesh = new THREE.InstancedMesh(filledGeo, filledMats, Math.max(filled.length, 1))
-      filledMesh.castShadow = true
-      for (let i = 0; i < filled.length; i++) {
-        const { r, c, m } = filled[i]
-        writeInstance(filledMesh, i, r, c, m)
-        beadIndex.set(r * MAX_GRID + c, { mesh: filledMesh, idx: i })
-      }
-      filledMesh.count = filled.length
-      filledMesh.instanceMatrix.needsUpdate = true
-      if (filledMesh.instanceColor) filledMesh.instanceColor.needsUpdate = true
-      scene.add(filledMesh)
-    }
-    if (fused.length > 0) {
-      fusedMesh = new THREE.InstancedMesh(fusedGeo, filledMats, Math.max(fused.length, 1))
-      fusedMesh.castShadow = true
-      for (let i = 0; i < fused.length; i++) {
-        const { r, c, m } = fused[i]
-        writeInstance(fusedMesh, i, r, c, m)
-        beadIndex.set(r * MAX_GRID + c, { mesh: fusedMesh, idx: i })
-      }
-      fusedMesh.count = fused.length
-      fusedMesh.instanceMatrix.needsUpdate = true
-      if (fusedMesh.instanceColor) fusedMesh.instanceColor.needsUpdate = true
-      scene.add(fusedMesh)
-    }
+    if (hollow.length > 0) hollowMesh = buildBeadMesh(hollow, hollowGeo, hollowMats)
+    if (filled.length > 0) filledMesh = buildBeadMesh(filled, filledGeo, filledMats)
+    if (fused.length > 0) fusedMesh = buildBeadMesh(fused, fusedGeo, filledMats)
   }
 
   /** 重建图纸色块实例（导入/清空/载入时） */
@@ -596,7 +564,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   }
 
   function onPointerMove(e: PointerEvent) {
-    // 命中过滤：pointermove 挂在 window 上，指针落在 UI 覆盖层（透明侧栏/对话框/作品列表）时
+    // 命中过滤：pointermove 挂在 window 上，指针落在 UI 覆盖层（透明侧栏/对话框）时
     // 直接跳过，不做射线与样式计算。画布铺满全窗口（覆盖层悬浮其上），不能用 rect 范围判断，
     // 用 elementFromPoint 取该点顶层元素：不是画布容器内的元素即为覆盖层；
     // 拖拽中指针移出画布仍需继续（跨边界连续放豆/熨烫），不裁剪
@@ -623,15 +591,14 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
         Math.min(PITCH_MAX, rotDrag.pitch0 + (e.clientY - rotDrag.sy) * ROT_SPEED),
       )
       applyView()
-      ensureGridFitsViewport()
       return
     }
     if (!p) return
     store.mouse.x = p.x * CELL
     store.mouse.y = p.z * CELL
 
-    // 设计模式按住拖拽连续放豆/擦除（placeBead 仅在内容实际变化时递增 gridVersion）
-    if (store.mode === 'design' && !store.viewMode && store.mouse.down) placeBead(p.x * CELL, p.z * CELL)
+    // 设计放豆模式按住拖拽连续放豆/擦除（placeBead 仅在内容实际变化时递增 gridVersion）
+    if (isDesignView.value && store.mouse.down) placeBead(p.x * CELL, p.z * CELL)
   }
 
   function onPointerUp() {
@@ -672,7 +639,6 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     }
     controls.target.set(center.x, 0, center.z)
     updateSceneVisibility()
-    ensureGridFitsViewport()
     markRender()
   }
 
@@ -781,7 +747,6 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     renderer.setSize(w, h, false)
     baseDist = computeBaseDist(h)
     applyView()
-    ensureGridFitsViewport()
   }
 
   function update() {
@@ -805,7 +770,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
         if (!entry) continue
         const entryForm = entry.mesh === fusedMesh ? 2 : entry.mesh === filledMesh ? 1 : 0
         if (formOf(cell.melt) !== entryForm) {
-          requestRebuild()
+          rebuildBeadsOnce.request()
           return
         }
       }
@@ -833,45 +798,37 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     markRender()
   }
 
-  let rebuildPending = false
-  let rebuildRaf = 0
-
-  /** 珠子层内容变化（放豆/擦除/导入/清空/载入/熔融跨形态边界）→ 下一帧合并重建珠子实例（不重建图纸层：
-   *  放豆/擦除不会改变 pixel 层，图纸实例无需动）。
-   *  同一帧内多次触发只重建一次：拖拽放豆/6×6 擦除每个 pointermove 都可能触发 gridVersion++，
-   *  同步全量重建会反复扫描整表 + 新建 InstancedMesh；延迟一帧后肉眼不可见，
-   *  重建次数从“每 move”降到“每帧一次” */
-  function requestRebuild() {
-    if (rebuildPending) return
-    rebuildPending = true
-    rebuildRaf = requestAnimationFrame(() => {
-      rebuildPending = false
-      buildBeadInstances()
-      markRender()
-    })
+  /** rAF 去重包装：同一帧内多次请求只执行一次（拖拽放豆/擦除每个 pointermove 都可能触发
+   *  gridVersion++，同步全量重建会反复扫描整表 + 新建 InstancedMesh；延迟一帧后肉眼不可见，
+   *  重建次数从“每 move”降到“每帧一次”）。
+   *  珠子层重建（rebuildBeadsOnce）与图纸层重建（rebuildPatternOnce）分开：放豆/擦除只改
+   *  珠子层不重建图纸层，导入/清空/载入（patternVersion++）只重建图纸层 */
+  function deferOnce(fn: () => void) {
+    let pending = false
+    let raf = 0
+    const request = () => {
+      if (pending) return
+      pending = true
+      raf = requestAnimationFrame(() => {
+        pending = false
+        fn()
+        markRender()
+      })
+    }
+    const cancel = () => {
+      cancelAnimationFrame(raf)
+      pending = false
+    }
+    return { request, cancel }
   }
 
-  let rebuildPatternPending = false
-  let rebuildPatternRaf = 0
-
-  /** 图纸层变化（导入/清空/载入，patternVersion++）→ 下一帧仅重建图纸实例。
-   *  与 requestRebuild 分开：放豆/擦除只改珠子层，不必重建图纸层 */
-  function requestRebuildPattern() {
-    if (rebuildPatternPending) return
-    rebuildPatternPending = true
-    rebuildPatternRaf = requestAnimationFrame(() => {
-      rebuildPatternPending = false
-      rebuildPattern()
-      markRender()
-    })
-  }
+  const rebuildBeadsOnce = deferOnce(buildBeadInstances)
+  const rebuildPatternOnce = deferOnce(rebuildPattern)
 
   function dispose() {
     cancelAnimationFrame(raf)
-    cancelAnimationFrame(rebuildRaf)
-    cancelAnimationFrame(rebuildPatternRaf)
-    rebuildPending = false
-    rebuildPatternPending = false
+    rebuildBeadsOnce.cancel()
+    rebuildPatternOnce.cancel()
     controls.dispose()
     // 释放实例缓冲与场景内全部几何/材质：renderer.dispose 只释放渲染器级资源，
     // 对象级 GPU 缓冲（instanceMatrix 等）必须逐个 dispose，否则热重载/反复进出会累积
@@ -944,8 +901,8 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   return {
     resize,
     update,
-    requestRebuild,
-    requestRebuildPattern,
+    requestRebuild: rebuildBeadsOnce.request,
+    requestRebuildPattern: rebuildPatternOnce.request,
     rebuild,
     fitView: fitViewToBoard,
     dispose,

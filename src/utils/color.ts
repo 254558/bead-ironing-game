@@ -18,30 +18,11 @@ export const COLORS = [
 ]
 
 function hexToRgb(h: string): [number, number, number] {
-  if (h.startsWith('rgb')) {
-    const m = h.match(/\d+/g)!
-    return [Number(m[0]), Number(m[1]), Number(m[2])]
-  }
   return [
     parseInt(h.slice(1, 3), 16),
     parseInt(h.slice(3, 5), 16),
     parseInt(h.slice(5, 7), 16),
   ]
-}
-
-/** 颜色调亮(a>0)/调暗(a<0)，与原实现一致 */
-export function shade(h: string, a: number): string {
-  let [r, g, b] = hexToRgb(h)
-  if (a < 0) {
-    r *= 1 + a
-    g *= 1 + a
-    b *= 1 + a
-  } else {
-    r += (255 - r) * a
-    g += (255 - g) * a
-    b += (255 - b) * a
-  }
-  return `rgb(${r | 0},${g | 0},${b | 0})`
 }
 
 /** 珠子尺寸/反光的确定性伪随机散列 */

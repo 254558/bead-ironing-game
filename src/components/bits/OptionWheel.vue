@@ -7,7 +7,7 @@ import { ref, computed, watch, onMounted, onUnmounted, type CSSProperties, type 
 export type Side = 'left' | 'right';
 
 interface OptionWheelProps {
-  items?: string[];
+  items: string[];
   defaultSelected?: number;
   textColor?: string;
   activeColor?: string;
@@ -23,8 +23,6 @@ interface OptionWheelProps {
   inset?: number;
   loop?: boolean;
   draggable?: boolean;
-  soundUrl?: string;
-  soundVolume?: number;
   /** 色块模式：选项渲染为圆形色块（背景 = 选项字符串） */
   swatch?: boolean;
   /** 橡皮项下标（色块模式下该项渲染为橡皮 ✕，默认 -1 表示无） */
@@ -34,20 +32,6 @@ interface OptionWheelProps {
 }
 
 const props = withDefaults(defineProps<OptionWheelProps>(), {
-  items: () => [
-    'Ambient',
-    'House',
-    'Techno',
-    'Jazz',
-    'Lo-Fi',
-    'Synthwave',
-    'Trance',
-    'Funk',
-    'Disco',
-    'Hip-Hop',
-    'Chillwave',
-    'Drum & Bass'
-  ],
   defaultSelected: 3,
   textColor: '#a6a6a6',
   activeColor: '#ffffff',
@@ -63,8 +47,6 @@ const props = withDefaults(defineProps<OptionWheelProps>(), {
   inset: 80,
   loop: false,
   draggable: true,
-  soundUrl: '',
-  soundVolume: 0.5,
   swatch: false,
   eraserIndex: -1,
   selected: null
@@ -99,9 +81,6 @@ let last = 0;
 let wheelTimer: ReturnType<typeof setTimeout> | null = null;
 let drag: { y: number; start: number; id: number } | null = null;
 let dragMoved = false;
-let audio: HTMLAudioElement | null = null;
-let audioUrl = '';
-let lastTick = 0;
 
 // Single rAF loop that eases the wheel position toward its target with
 // frame-rate independent exponential smoothing, then lays every option out
@@ -158,23 +137,6 @@ const startLoop = () => {
   raf = requestAnimationFrame(runFrame);
 };
 
-// Optional tick on selection change, throttled so fast scrolling can't spam
-// it, and with playback failures (e.g. autoplay policies) silently ignored.
-const playTick = () => {
-  if (!props.soundUrl) return;
-  const now = performance.now();
-  if (now - lastTick < 70) return;
-  lastTick = now;
-  if (!audio || audioUrl !== props.soundUrl) {
-    audio = new Audio(props.soundUrl);
-    audio.preload = 'auto';
-    audioUrl = props.soundUrl;
-  }
-  audio.volume = Math.min(Math.max(props.soundVolume, 0), 1);
-  audio.currentTime = 0;
-  audio.play()?.catch(() => {});
-};
-
 const applyTarget = (value: number, snap: boolean) => {
   let v = value;
   const n = props.items.length;
@@ -185,7 +147,6 @@ const applyTarget = (value: number, snap: boolean) => {
   if (idx !== selectedIndex.value) {
     selectedIndex.value = idx;
     emit('change', idx, props.items[idx]);
-    playTick();
   }
   startLoop();
 };
@@ -223,7 +184,6 @@ const handleItemClick = (index: number) => {
   // 随后由受控 selected 的 watcher 滑回当前颜色
   if (index === props.eraserIndex && selectedValue.value === index) {
     emit('change', index, props.items[index]);
-    playTick();
     return;
   }
   const n = props.items.length;
@@ -317,7 +277,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (raf != null) cancelAnimationFrame(raf);
-  audio?.pause();
   removeWheelListener?.();
 });
 </script>

@@ -35,7 +35,7 @@ watch(
   () => board?.requestRebuildPattern(),
 )
 
-// 窗口 resize（Stage.measure → resizeTick）→ 适配视口并扩容网格
+// 窗口 resize（Stage.measure → resizeTick）→ 适配视口
 watch(
   () => store.resizeTick,
   () => board?.resize(),
@@ -46,8 +46,7 @@ onMounted(() => {
     // createThreeBoard 内部已做初始 resize + rebuild（已有内容也一并渲染），
     // 此处不再二次 rebuild；后续 resizeTick/gridVersion/patternVersion 变化由上方 watch 接管
     board = createThreeBoard(wrap.value)
-    // 载入即熨烫模式（autosave 恢复）时也启动熔融循环：watch 只在模式变化时触发，
-    // 页面加载时若已是 ironing 模式则永不启动，熨烫会一直无效
+    // 页面加载时若已是 ironing 模式，上方 watch 不会触发（只在模式变化时运行）→ 手动启动熔融循环
     if (store.mode === 'ironing') startIronLoop()
   }
 })

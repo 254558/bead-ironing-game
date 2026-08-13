@@ -1,6 +1,6 @@
 # pattern-library · 图纸库
 
-宝可梦卡牌全息效果参考页（Vite + Svelte 3），作为 npm workspace 并入 **bead-ironing** 游戏仓库，为游戏提供「内置图纸」。
+宝可梦卡牌全息效果参考页（Vite + Svelte 3），作为 npm workspace 并入 **bead-ironing** 游戏仓库，为游戏提供「内置图纸」：游戏内点「图纸」打开全屏参考页，展开卡牌点「import」自动铺豆。
 
 代码源自上游开源项目 [simeydotme/pokemon-cards-css](https://github.com/simeydotme/pokemon-cards-css)（Holographic Trading Card Effect）。并入后按游戏需求删减了废弃素材，并新增 `public/patterns/` 下的 38 张拼豆图纸。
 
@@ -38,11 +38,9 @@ public/pattens/             （产物：游戏运行时加载的成品）
 见根目录 README 的「新增一张图纸」章节，完整步骤：
 
 1. 放图纸 → `public/patterns/p39.webp`（两位补零编号，1024×1024、40×40 网格）
-2. `src/App.svelte` 末尾追加 `<Card id="pattern-39" …>`
-3. 游戏 `src/components/PatternPicker.vue` 的 PATTERNS 数组加名字
-4. 根目录跑 `npm run build:patterns` 同步
-5. 更新游戏 UI 里写死的「内置 38 张图纸选」计数（ImportDialog.vue / PatternPicker.vue）
-6. `npm run dev` 验证
+2. `src/App.svelte` 末尾追加 `<Card id="pattern-39" …>`（id 必须按 `pattern-NN` 命名，游戏按 id 拉取）
+3. 根目录跑 `npm run build:patterns` 同步
+4. `npm run dev` 验证：展开新卡点「import」铺豆正常，参考页能看到新卡
 
 ## 关键文件
 

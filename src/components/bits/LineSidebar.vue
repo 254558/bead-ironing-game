@@ -7,7 +7,7 @@ import { computed, ref, watch, onUnmounted, type CSSProperties, type ComponentPu
 export type Falloff = 'linear' | 'smooth' | 'sharp';
 
 interface LineSidebarProps {
-  items?: string[];
+  items: string[];
   accentColor?: string;
   textColor?: string;
   markerColor?: string;
@@ -35,20 +35,6 @@ const FALLOFF_CURVES: Record<Falloff, (p: number) => number> = {
 };
 
 const props = withDefaults(defineProps<LineSidebarProps>(), {
-  items: () => [
-    'Overview',
-    'Components',
-    'Animations',
-    'Backgrounds',
-    'Showcase',
-    'Playground',
-    'Templates',
-    'Changelog',
-    'Community',
-    'Resources',
-    'Documentation',
-    'Support'
-  ],
   accentColor: '#A855F7',
   textColor: '#c4c4c4',
   markerColor: '#6c6c6c',

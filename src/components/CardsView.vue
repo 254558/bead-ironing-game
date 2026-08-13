@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue'
-import { store } from '../stores/game'
-import { importImage } from '../utils/imageImport'
+import { showStatus, store } from '../stores/game'
+import { importWebpPattern } from '../utils/imageImport'
+import { useEscapeKey } from '../composables/useEscapeKey'
 
 /** 关闭图纸库，回到拼豆画布（画布状态原样保留） */
 function close() {
@@ -17,13 +18,9 @@ async function importPattern(id: string) {
   importing = true
   const n = String(Number(m[1])).padStart(2, '0')
   try {
-    const res = await fetch(`pattens/patterns/p${n}.webp`)
-    if (!res.ok) throw new Error(res.statusText)
-    const file = new File([await res.blob()], `p${n}.webp`, { type: 'image/webp' })
-    importImage(file, 'beads')
+    await importWebpPattern(`pattens/patterns/p${n}.webp`, `p${n}.webp`)
   } catch {
-    store.status = '图纸导入失败，请稍后重试'
-    store.statusVisible = true
+    showStatus('图纸导入失败，请稍后重试')
   }
   importing = false
   close()
@@ -36,19 +33,10 @@ function onMessage(e: MessageEvent) {
   if (e.data.type === 'bead-import-pattern' && typeof e.data.id === 'string') importPattern(e.data.id)
 }
 
-/** Esc 键退出图纸库（iframe 顶部「Patterns」可点击返回，Esc 作为补充出口） */
-function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape') close()
-}
+useEscapeKey(close)
 
-onMounted(() => {
-  window.addEventListener('message', onMessage)
-  window.addEventListener('keydown', onKeydown)
-})
-onUnmounted(() => {
-  window.removeEventListener('message', onMessage)
-  window.removeEventListener('keydown', onKeydown)
-})
+onMounted(() => window.addEventListener('message', onMessage))
+onUnmounted(() => window.removeEventListener('message', onMessage))
 </script>
 
 <template>

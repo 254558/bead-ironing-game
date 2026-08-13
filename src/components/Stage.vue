@@ -1,18 +1,13 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, useTemplateRef } from 'vue'
-import { setupGrid, showStatus, store } from '../stores/game'
+import { onMounted, onUnmounted } from 'vue'
+import { showStatus, store } from '../stores/game'
 import BoardView from './BoardView.vue'
 import StatusBar from './StatusBar.vue'
 
-const root = useTemplateRef<HTMLDivElement>('root')
 let resizeTimer: ReturnType<typeof setTimeout> | undefined
 
-/** 按容器尺寸重建网格，并通知画布/3D 适配 */
+/** 容器尺寸变化（窗口 resize / 布局调整）→ 通知画布/3D 适配（画布固定 40×40，无需重设网格） */
 function measure() {
-  const el = root.value
-  const w = el?.clientWidth || window.innerWidth
-  const h = el?.clientHeight || window.innerHeight - 70
-  setupGrid(w, h)
   store.resizeTick++
 }
 
@@ -33,7 +28,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div ref="root" class="canvas-wrap">
+  <div class="canvas-wrap">
     <BoardView />
     <StatusBar />
   </div>

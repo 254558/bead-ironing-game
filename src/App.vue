@@ -1,16 +1,13 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent } from 'vue'
+import { computed } from 'vue'
 import CardsView from './components/CardsView.vue'
 import ColorWheelPanel from './components/ColorWheelPanel.vue'
 import Stage from './components/Stage.vue'
 import ToolPanel from './components/ToolPanel.vue'
-import { store } from './stores/game'
-
-// 图纸选择器：点开才下载对应代码（含图片识别逻辑），减小首屏 JS
-const PatternPicker = defineAsyncComponent(() => import('./components/PatternPicker.vue'))
+import { isDesignView, store } from './stores/game'
 
 // 取色器（右侧颜色轮）仅在「设计」模式出现；熨烫/视角工具时滑走隐藏
-const showColorWheel = computed(() => store.mode === 'design' && !store.viewMode)
+const showColorWheel = computed(() => isDesignView.value)
 </script>
 
 <template>
@@ -26,7 +23,6 @@ const showColorWheel = computed(() => store.mode === 'design' && !store.viewMode
         <ColorWheelPanel />
       </aside>
     </Transition>
-    <PatternPicker v-if="store.showPatternPicker" />
     <CardsView v-if="store.cardsView" />
   </div>
 </template>

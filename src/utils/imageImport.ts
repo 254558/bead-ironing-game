@@ -1,4 +1,4 @@
-import { clearCellContent, expandGrid, MAX_GRID, showStatus, store, switchMode } from '../stores/game'
+import { clearCellContent, MAX_GRID, showStatus, store, switchMode } from '../stores/game'
 import { COLORS, COLORS_RGB, MAX_PIX } from '../utils/color'
 import type { ImportMode } from '../types'
 
@@ -248,8 +248,7 @@ function importGridBeads(img: HTMLImageElement): boolean {
     return false // canvas 尺寸超限（如 iOS Safari）等异常：回退普通识别
   }
 
-  expandGrid(nx, ny)
-  for (const row of store.grid) for (const cell of row) clearCellContent(cell)
+  clearGrid()
 
   // 相机从近侧俯视棋盘：整图 180° 镜像翻转（与普通识别一致），否则图纸在棋盘上倒置
   const offC = Math.floor((store.cols - nx) / 2)
@@ -352,12 +351,31 @@ function importGridBeads(img: HTMLImageElement): boolean {
     }
   }
 
-  switchMode('ironing')
+  finishImport('ironing', `已从图纸生成 ${nx}×${ny} 豆子，颜色与图纸一致，可熨烫压平`)
+  return true
+}
+
+/** 清空全部格子（珠子 + 图纸像素），导入写新图前调用 */
+function clearGrid() {
+  for (const row of store.grid) for (const cell of row) clearCellContent(cell)
+}
+
+/** 导入写入完成后的统一收尾：切换模式、失效珠子/图纸两层缓存、请求视角归中、提示文案 */
+function finishImport(mode: 'ironing' | 'design', text: string) {
+  switchMode(mode)
   store.gridVersion++ // 图纸写入完成，通知画布静态层缓存失效
   store.patternVersion++ // 图纸层重写，通知画布重建图纸实例
   store.fitViewTick++ // 导入完成，通知 3D 自动适配视角（整个棋盘入镜）
-  showStatus(`已从图纸生成 ${nx}×${ny} 豆子，颜色与图纸一致，可熨烫压平`)
-  return true
+  showStatus(text)
+}
+
+/** 拉取内置 webp 图纸并按 beads 模式导入（自动识别 40×40 网格铺好豆子）。
+ *  图纸选择器 / 图纸库共用；失败时抛出，由调用方负责 loading 复位与报错 toast */
+export async function importWebpPattern(src: string, filename?: string) {
+  const res = await fetch(src)
+  if (!res.ok) throw new Error(res.statusText)
+  const file = new File([await res.blob()], filename ?? src.split('/').pop()!, { type: 'image/webp' })
+  importImage(file, 'beads')
 }
 
 export function importImage(file: File, mode: ImportMode) {
@@ -386,9 +404,7 @@ export function importImage(file: File, mode: ImportMode) {
       pw = Math.max(1, Math.round(MAX_PIX * ir))
     }
 
-    expandGrid(pw, ph)
-
-    for (const row of store.grid) for (const cell of row) clearCellContent(cell)
+    clearGrid()
 
     const oc = document.createElement('canvas')
     oc.width = pw
@@ -418,14 +434,9 @@ export function importImage(file: File, mode: ImportMode) {
       }
     }
 
-    switchMode(mode === 'beads' ? 'ironing' : 'design')
-    store.gridVersion++ // 图纸写入完成，通知画布静态层缓存失效
-    store.patternVersion++ // 图纸层重写，通知画布重建图纸实例
-    store.fitViewTick++ // 导入完成，通知 3D 自动适配视角（整个棋盘入镜）
-    showStatus(
-      mode === 'beads'
-        ? '豆子已自动铺好，颜色与图纸一致，可熨烫压平'
-        : '导入完成：拼豆图纸，可对照放豆',
+    finishImport(
+      mode === 'beads' ? 'ironing' : 'design',
+      mode === 'beads' ? '豆子已自动铺好，颜色与图纸一致，可熨烫压平' : '导入完成：拼豆图纸，可对照放豆',
     )
     URL.revokeObjectURL(url)
   }

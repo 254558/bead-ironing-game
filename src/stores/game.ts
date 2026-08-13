@@ -1,6 +1,6 @@
 import { computed, markRaw, reactive } from 'vue'
 import type { Cell, IronCenter, Mode, MouseState } from '../types'
-import { CELL, COLORS, DISPLAY_CELL } from '../utils/color'
+import { CELL, COLORS } from '../utils/color'
 
 /** 网格上限：固定 40×40 画布（不随视口/图片扩容），超出部分为工作台深色区域 */
 export const MAX_GRID = 40
@@ -28,8 +28,6 @@ export const store = reactive({
    *  与 gridVersion 分开：放豆/擦除只改珠子层，不必重建图纸实例 */
   patternVersion: 0,
   mode: 'design' as Mode,
-  /** 图纸选择器开关（点「图纸」打开：可导入本地图片当图纸参考，或从 38 张内置图纸挑一张自动放豆） */
-  showPatternPicker: false,
   /** 图纸库：宝可梦卡牌全息效果参考页（全屏 iframe），打开时盖住整个应用 */
   cardsView: false,
   mouse: { x: -1, y: -1, down: false } as MouseState,
@@ -57,6 +55,9 @@ export const hasBeads = computed(() => {
   return store.grid.some((row) => row.some((c) => c.color !== null))
 })
 
+/** 设计放豆模式（非视角工具）：画布放豆/擦除操作可用 */
+export const isDesignView = computed(() => store.mode === 'design' && !store.viewMode)
+
 let statusTimer: ReturnType<typeof setTimeout> | undefined
 
 export function showStatus(text: string) {
@@ -66,41 +67,6 @@ export function showStatus(text: string) {
   statusTimer = setTimeout(() => {
     store.statusVisible = false
   }, STATUS_DISPLAY_MS)
-}
-
-/**
- * 画布固定 40×40：任何入参都被钳回 40×40（MAX_GRID），即恒为 no-op。
- * 保留此调用链（board.ts 的视口适配/滚轮/WASD/resize 仍会调用），
- * 画布尺寸稳定，四周为工作台深色区域。
- */
-export function expandGridKeep(minCols: number, minRows: number) {
-  const nc = Math.min(MAX_GRID, Math.max(store.cols, Math.ceil(minCols)))
-  const nr = Math.min(MAX_GRID, Math.max(store.rows, Math.ceil(minRows)))
-  if (nc === store.cols && nr === store.rows) return
-  const g = createGrid(nc, nr)
-  for (let r = 0; r < store.rows; r++)
-    for (let c = 0; c < store.cols; c++) g[r][c] = store.grid[r][c]
-  store.grid = markRaw(g)
-  store.cols = nc
-  store.rows = nr
-  store.gridVersion++ // 网格线数量变化，静态层缓存失效
-}
-
-/**
- * 窗口/容器尺寸变化 → 画布固定 40×40，无需扩容（expandGridKeep 恒 no-op）。
- * 保留调用以维持 Stage → store 的测量通知链路；3D 侧由 resizeTick 自行适配视角。
- */
-export function setupGrid(w: number, h: number) {
-  expandGridKeep(Math.ceil(w / DISPLAY_CELL), Math.ceil(h / DISPLAY_CELL))
-}
-
-/** 图片导入时按需扩容画布（调用方随后会覆盖全部格子）；画布固定 40×40，图案 ≤40×40 时恒 no-op */
-export function expandGrid(minCols: number, minRows: number) {
-  if (store.cols < minCols || store.rows < minRows) {
-    store.cols = Math.max(store.cols, minCols)
-    store.rows = Math.max(store.rows, minRows)
-    store.grid = markRaw(createGrid(store.cols, store.rows))
-  }
 }
 
 export function getCellAt(x: number, y: number): { r: number; c: number } | null {
