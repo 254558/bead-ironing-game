@@ -29,3 +29,16 @@
     background-position, background-blend-mode, filter;
  
 }
+
+/* 拼豆图纸模式（素图）：隐藏全息炫彩层，卡片直接显示图纸原图（webp 素色）。
+   保证「图纸库里看到的颜色 = 导入后豆子颜色」所见即所得——
+   全息炫彩（color-dodge 彩虹渐变，颜色随鼠标动态变化）无法被拼豆量化还原，
+   显示它会导致用户看到的图纸与豆子严重色差（如灰阶图纸被渲染成金棕色系）。 */
+.card__shine,
+.card__shine::before,
+.card__shine::after,
+.card__glare,
+.card__glare::before,
+.card__glare::after {
+  display: none !important;
+}
