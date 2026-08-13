@@ -173,7 +173,9 @@ const GRID_MAX_PIXELS = 40_000_000 // 4800×4800 = 2300 万，留足余量
  *    均值极值（比格子暗/亮）+ 方差极小（内容与线同色时线整行均匀）检测网格线 →
  *    扫描候选格子数，按「相位对齐率 + 覆盖命中率」确定 nx×ny 与周期/相位；
  * 2) 按周期+相位直接取每个格子中心的 3×3 平均色（远离网格线）；
- * 3) 中心色量化到调色板，写入 pixel + color。
+ * 3) 中心色直接作为豆子颜色写入 pixel + color——所见即所得：图纸格子是什么纯色，
+ *    豆子就是什么颜色，不再量化到 32 色板（浅绿等图纸色不会落白/落灰）。
+ *    仅把 webp 压缩产生的 ±1~3 噪声变体（同一视觉颜色的几个接近值）合并回一种。
  * 成功返回 true（调用方不再走普通缩放识别）。
  *
  * 注意：不能把原图缩成 1 列/1 行再读像素——canvas 缩小是点采样（取最左/最上行），
@@ -258,11 +260,11 @@ function importGridBeads(img: HTMLImageElement): boolean {
   const TR = hg!.T
   const phC = vg!.phase
   const phR = hg!.phase
+  // 第一趟：采样所有格子中心色（先不进调色板，按图纸原色生成豆子）
+  const cellSamples: [number, number, number][][] = Array.from({ length: ny }, () => Array(nx))
   for (let r = 0; r < ny; r++) {
-    const gr = offR + (ny - 1 - r)
     const cy = Math.round(phR + (r + 0.5) * TR)
     for (let c = 0; c < nx; c++) {
-      const gc = offC + (nx - 1 - c)
       const cx = Math.round(phC + (c + 0.5) * TC)
       let sr = 0
       let sg = 0
@@ -281,9 +283,69 @@ function importGridBeads(img: HTMLImageElement): boolean {
           cnt++
         }
       }
-      const best = nearestColor(sr / cnt, sg / cnt, sb / cnt)
-      store.grid[gr][gc].pixel = COLORS[best]
-      store.grid[gr][gc].color = COLORS[best]
+      cellSamples[r][c] = [sr / cnt, sg / cnt, sb / cnt]
+    }
+  }
+  // 第二趟：合并 webp 噪声变体。同一视觉颜色在压缩后会有几个接近值
+  // （如 (255,126,1)/(255,126,0)/(254,126,1)），Oklab 色距 < MERGE_DE 视为同色合并，
+  // 取加权平均作代表色；频次降序让主色当锚点，噪声变体归并进去。
+  const MERGE_DE = 0.02
+  const freq = new Map<string, { r: number; g: number; b: number; n: number }>()
+  for (const row of cellSamples)
+    for (const [sr, sg, sb] of row) {
+      const key = `${Math.round(sr)},${Math.round(sg)},${Math.round(sb)}`
+      const hit = freq.get(key)
+      if (hit) {
+        hit.r += sr
+        hit.g += sg
+        hit.b += sb
+        hit.n++
+      } else {
+        freq.set(key, { r: sr, g: sg, b: sb, n: 1 })
+      }
+    }
+  const sorted = [...freq.entries()].sort((a, b) => b[1].n - a[1].n)
+  const clusters: { r: number; g: number; b: number; n: number }[] = []
+  const keyToCluster = new Map<string, number>()
+  for (const [key, c] of sorted) {
+    const cl = oklab(c.r / c.n, c.g / c.n, c.b / c.n)
+    let ci = -1
+    for (let k = 0; k < clusters.length; k++) {
+      const pc = clusters[k]
+      const pk = oklab(pc.r / pc.n, pc.g / pc.n, pc.b / pc.n)
+      const d = (cl[0] - pk[0]) ** 2 + (cl[1] - pk[1]) ** 2 + (cl[2] - pk[2]) ** 2
+      if (d < MERGE_DE * MERGE_DE) {
+        ci = k
+        break
+      }
+    }
+    if (ci < 0) {
+      clusters.push({ r: c.r, g: c.g, b: c.b, n: c.n })
+      ci = clusters.length - 1
+    } else {
+      clusters[ci].r += c.r
+      clusters[ci].g += c.g
+      clusters[ci].b += c.b
+      clusters[ci].n += c.n
+    }
+    keyToCluster.set(key, ci)
+  }
+  const repHex = clusters.map((c) => {
+    const rr = Math.round(c.r / c.n)
+    const gg = Math.round(c.g / c.n)
+    const bb = Math.round(c.b / c.n)
+    return '#' + [rr, gg, bb].map((v) => v.toString(16).padStart(2, '0')).join('')
+  })
+  // 第三趟：写入（图纸像素层与豆子层同色，所见即所得）
+  for (let r = 0; r < ny; r++) {
+    const gr = offR + (ny - 1 - r)
+    for (let c = 0; c < nx; c++) {
+      const gc = offC + (nx - 1 - c)
+      const [sr, sg, sb] = cellSamples[r][c]
+      const key = `${Math.round(sr)},${Math.round(sg)},${Math.round(sb)}`
+      const hex = repHex[keyToCluster.get(key)!]
+      store.grid[gr][gc].pixel = hex
+      store.grid[gr][gc].color = hex
     }
   }
 
