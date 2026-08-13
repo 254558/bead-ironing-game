@@ -17,12 +17,12 @@ body,
 
 html,
 body {
-  /* 页面底色兜底 = 3D 场景深色背景，避免首屏/异常时露出浏览器白底 */
-  background: #171a21;
+  /* 页面底色兜底 = 3D 场景纯黑背景，避免首屏/异常时露出浏览器白底 */
+  background: #000000;
 }
 
 body {
-  /* 页面背景透明：侧栏/工具栏/调色盘为透明面板，悬浮在深色棋盘之上 */
+  /* 页面背景透明：侧栏/工具栏/调色盘为透明面板，悬浮在纯黑棋盘之上 */
   background: transparent;
   color: #d6dae1;
   font-family: system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;

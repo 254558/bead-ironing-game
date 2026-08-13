@@ -58,12 +58,12 @@ const FILL_MELT = 0.35
  */
 export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   const scene = new THREE.Scene()
-  // 背景深色：棋盘地面/背景一体（侧栏透明悬浮其上）。不用纯透明——
+  // 背景纯黑：棋盘地面/背景一体（侧栏透明悬浮其上）。不用纯透明——
   // 有些浏览器的默认页面底色为白，透明处会露出白块
-  scene.background = new THREE.Color(0x171a21)
+  scene.background = new THREE.Color(0x000000)
   // 与背景同色的雾（仅设计模式工作台启用）：地面在远处（70~550 单位）平滑渐隐为背景色，
   // 消除低视角时地面与背景的硬交界（地平线）；棋盘在 50 单位内不受影响
-  const fog = new THREE.Fog(0x171a21, 70, 550)
+  const fog = new THREE.Fog(0x000000, 70, 550)
   scene.fog = fog
 
   const camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 600)
@@ -122,14 +122,16 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   upFill.target = new THREE.Object3D()
   scene.add(upFill.target)
 
-  // 工作台地面（深色，比背景略亮以区分平面，接收珠子的投影）；范围足够大，任何缩放下都盖住视口
+  // 工作台地面：无光照纯黑平面，与背景一体（MeshBasicMaterial 不受光也不反射环境贴图；
+  // 注意 MeshStandardMaterial 的 envMapIntensity 会被 scene.environmentIntensity 覆盖，
+  // 黑色 standard 材质仍会反射 RoomEnvironment 的白光变成灰，必须用无光照材质）。
+  // 范围足够大，任何缩放下都盖住视口。纯黑地面上珠子投影不可见，无需 receiveShadow
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(3000, 3000),
-    new THREE.MeshStandardMaterial({ color: 0x21252d, roughness: 0.95, metalness: 0 }),
+    new THREE.MeshBasicMaterial({ color: 0x000000 }),
   )
   ground.rotation.x = -Math.PI / 2
   ground.position.y = -0.02
-  ground.receiveShadow = true
   scene.add(ground)
 
   // 网格线：MAX_GRID 全范围一次构建，相机自动裁剪
