@@ -132,22 +132,21 @@ export function createFusedBeadGeometry(): THREE.ExtrudeGeometry {
 }
 
 /**
- * 豆子外壁材质：清漆反光（clearcoat 0.7、微光）。
- * 圆柱曲面受光形成垂直亮带——侧面的塑料反光感来自这里。
- * 强度刻意不拉满：俯视时外壁边缘是窄环，env 太强会变成每颗豆一圈白色眩光（"很强的反光"）；
- * 调到 ~200-215 亮度仍有清晰塑料感，但俯视不刺眼。
+ * 豆子外壁材质：哑光 EVA 塑料，保留轻微光泽。
+ * 原清漆参数（roughness 0.25/0.3、clearcoat 0.7、envMapIntensity 1.1）会让侧壁反射环境贴图——
+ * 翻到板底拖动视角时，反光高光带随视角连续扫动，图案边缘出现"细微波动"（用户反馈）；
+ * 改为近哑光后侧壁亮度几乎只由静态灯光决定，任意视角下不再波动。
+ * 圆柱曲面受光仍形成垂直亮带（立体感来源），env 保留 ~0.2-0.3 只留一丝环境光泽，
+ * 俯视时外壁窄环不再是一圈白眩光。
  */
 function createEvaSideMaterial(opts: { glossy: boolean }): THREE.MeshPhysicalMaterial {
   return new THREE.MeshPhysicalMaterial({
-    roughness: opts.glossy ? 0.25 : 0.3,
+    roughness: opts.glossy ? 0.6 : 0.7,
     metalness: 0,
-    clearcoat: 0.7,
-    clearcoatRoughness: 0.14,
-    // transmission 归零：同 cap 材质——不透明 EVA 不跑透射 pass
-    // NoToneMapping 下环境高光不再被 tone map 压缩，强度需比 Neutral 时低：
-    // 2.2 的 env 会把俯视时的外壁窄环过曝成一圈白色眩光，降到 1.1 仍有清晰塑料反光
-    envMapIntensity: 1.1,
-    specularIntensity: 0.8,
+    clearcoat: opts.glossy ? 0.2 : 0.1,
+    clearcoatRoughness: 0.35,
+    envMapIntensity: opts.glossy ? 0.3 : 0.2,
+    specularIntensity: 0.5,
   })
 }
 
