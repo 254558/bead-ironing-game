@@ -9,7 +9,8 @@ export const FUSE_SEALED = 0.5
 /** 豆子烫糊阈值：烫过此值视为烫糊，珠子整体压暗 */
 export const BURN = 0.85
 export const IRON_SPEED = 1.0
-export const MAX_PIX = 60
+/** 图片导入后图案最长边（格数）：画布固定 40×40，图案最长边不超过画布，居中写入 */
+export const MAX_PIX = 40
 
 /** 调色板（原应用完整颜色表） */
 export const COLORS = [

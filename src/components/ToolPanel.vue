@@ -23,6 +23,10 @@ function onItemClick(index: number) {
   switch (index) {
     case 0:
       switchMode('design')
+      // 已处于设计模式时 store.mode 值不变，BoardView 的 mode watch 不触发归中；
+      // 无条件自增 fitViewTick → 3D 渲染循环下一帧把整块画布收进视口（幂等），
+      // 保证「点设计」无论从哪个状态进入都画布居中
+      store.fitViewTick++
       break
     case 1:
       if (hasBeads) switchMode('ironing')

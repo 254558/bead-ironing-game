@@ -10,11 +10,15 @@ let board: ThreeBoardHandle | null = null
 // 熨烫动画循环：仅 ironing 模式运行，每帧回调 update() 局部更新熔融珠子
 const { start: startIronLoop, stop: stopIronLoop } = useIroning(() => board?.update())
 
+// 模式/视角工具切换：熨烫时启动熔融循环；进入「设计且非视角工具」状态时把画布整体居中收进视口。
+// 视角工具（viewMode）内不重置视角；从视角退出 / 熨烫切回设计时画布自动归中，
+// 保证棋盘始终在屏幕中间（缩放/平移/旋转后点「设计」也回到整块画布视图）
 watch(
-  () => store.mode,
-  (m) => {
+  [() => store.mode, () => store.viewMode],
+  ([m, viewMode]) => {
     if (m === 'ironing') startIronLoop()
     else stopIronLoop()
+    if (m === 'design' && !viewMode) board?.fitView()
   },
 )
 
@@ -23,6 +27,14 @@ watch(
 watch(
   () => store.gridVersion,
   () => board?.requestRebuild(),
+)
+
+// 熔融批量复位（熨烫后切回设计）→ 立即同步重建珠子层。
+// 若也走 rAF 延迟重建，下一帧棋盘线已恢复显示、珠子却仍是熔融后的浅色连片
+// （视觉上像一层白雾盖在棋盘上）；同步重建保证棋盘可见的第一帧就是空心珠
+watch(
+  () => store.meltResetTick,
+  () => board?.rebuildNow(),
 )
 
 // 图纸层变化（导入/清空/载入）→ 仅重建图纸实例，不动珠子层

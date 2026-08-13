@@ -2,8 +2,8 @@ import { computed, markRaw, reactive } from 'vue'
 import type { Cell, IronCenter, Mode, MouseState } from '../types'
 import { CELL, COLORS, DISPLAY_CELL } from '../utils/color'
 
-/** 网格上限（防止极端缩放下内存/遍历失控） */
-export const MAX_GRID = 200
+/** 网格上限：固定 40×40 画布（不随视口/图片扩容），超出部分为工作台深色区域 */
+export const MAX_GRID = 40
 
 /** 状态提示（toast）显示时长：game 的 status 隐藏与 StatusBar 的 toast life 共用 */
 export const STATUS_DISPLAY_MS = 3500
@@ -16,14 +16,18 @@ function createGrid(cols: number, rows: number): Cell[][] {
 
 /** 全局共享状态：网格 / 模式 / 鼠标 / 进度等 */
 export const store = reactive({
-  cols: 30,
-  rows: 30,
+  cols: 40,
+  rows: 40,
   /** 网格内容：markRaw 脱离深度代理（无任何 UI 模板读取格子，变化经 gridVersion 手动失效）。
-   *  否则最大 200×200=4 万格 × 每格对象都会被 reactive 深代理——扩容/熨烫每帧写穿
-   *  Proxy setter，纯开销无收益 */
-  grid: markRaw(createGrid(30, 30)) as Cell[][],
+     *  否则最大 200×200=4 万格 × 每格对象都会被 reactive 深代理——扩容/熨烫每帧写穿
+     *  Proxy setter，纯开销无收益 */
+  grid: markRaw(createGrid(40, 40)) as Cell[][],
   /** 网格内容版本号：任何珠子/图纸变更时 +1，供画布静态层缓存失效检测 */
   gridVersion: 0,
+  /** 熔融批量复位版本号：切回设计模式复位全部熔融时 +1。
+   *  与 gridVersion 分开：熔融复位后珠子实例必须立即同步重建（rAF 延迟会有一帧
+   *  白雾残留），普通放豆/擦除/扩容仍走按帧合并的延迟重建 */
+  meltResetTick: 0,
   /** 图纸（pixel 层）版本号：仅导入/清空/载入时 +1。
    *  与 gridVersion 分开：放豆/擦除只改珠子层，不必重建图纸实例 */
   patternVersion: 0,
@@ -45,7 +49,8 @@ export const store = reactive({
   statusVisible: false,
   /** 窗口 resize 后 +1，通知画布/3D 重新适配 */
   resizeTick: 0,
-  /** 导入图纸成功后 +1，通知 3D 自动调整视角让整个棋盘完整入镜（豆子太多超出视野时不用手动缩小） */
+  /** 视角归中请求：导入图纸成功后 +1（自动调整视角让整个棋盘入镜）；点「设计」也 +1
+   *  （即使已处于设计模式——mode 值不变 watch 不触发，靠 tick 变化让 3D 下一帧兜底归中） */
   fitViewTick: 0,
 })
 
@@ -68,8 +73,9 @@ export function showStatus(text: string) {
 }
 
 /**
- * 无限画布：网格按需扩容到覆盖视口（只增不减、保留已有内容，在右/下侧追加空行/列），
- * 供滚轮缩放 / 平移 / 窗口变化时保证视口内有格子可放豆。
+ * 画布固定 40×40：任何入参都被钳回 40×40（MAX_GRID），即恒为 no-op。
+ * 保留此调用链（board.ts 的视口适配/滚轮/WASD/resize 仍会调用），
+ * 画布尺寸稳定，四周为工作台深色区域。
  */
 export function expandGridKeep(minCols: number, minRows: number) {
   const nc = Math.min(MAX_GRID, Math.max(store.cols, Math.ceil(minCols)))
@@ -85,15 +91,14 @@ export function expandGridKeep(minCols: number, minRows: number) {
 }
 
 /**
- * 窗口/容器尺寸变化 → 把网格扩容到覆盖视口（内容坐标不变，只追加空行/列）。
- * 视口状态由 three/board.ts 维护（scale=1 时每格 DISPLAY_CELL 显示像素），
- * 这里按默认缩放的可见格数估算，棋盘渲染器随后会按实际可见范围再次扩容。
+ * 窗口/容器尺寸变化 → 画布固定 40×40，无需扩容（expandGridKeep 恒 no-op）。
+ * 保留调用以维持 Stage → store 的测量通知链路；3D 侧由 resizeTick 自行适配视角。
  */
 export function setupGrid(w: number, h: number) {
   expandGridKeep(Math.ceil(w / DISPLAY_CELL), Math.ceil(h / DISPLAY_CELL))
 }
 
-/** 图片导入时按需扩容画布（调用方随后会覆盖全部格子） */
+/** 图片导入时按需扩容画布（调用方随后会覆盖全部格子）；画布固定 40×40，图案 ≤40×40 时恒 no-op */
 export function expandGrid(minCols: number, minRows: number) {
   if (store.cols < minCols || store.rows < minRows) {
     store.cols = Math.max(store.cols, minCols)
@@ -175,12 +180,12 @@ export function switchMode(m: Mode) {
   store.mode = m
   // 视角工具只在设计模式使用，切走时关闭
   if (m !== 'design') store.viewMode = false
-  // 切回设计模式：全部珠子恢复未熔融；若在视角调整中，点「设计」退出视角工具（相机视角保留，可继续放豆）
+  // 切回设计模式：全部珠子恢复未熔融；若在视角调整中，点「设计」退出视角工具（视角自动归中到画布）
   let msg = '点击/拖拽放置拼豆'
   if (m === 'design') {
     if (store.viewMode) {
       store.viewMode = false
-      msg = '回到设计：视角已保留，可继续放豆'
+      msg = '回到设计：画布已居中'
     }
     let touched = false
     for (const row of store.grid)
@@ -191,6 +196,7 @@ export function switchMode(m: Mode) {
         }
     if (touched) {
       store.gridVersion++
+      store.meltResetTick++
     }
   } else {
     msg = '按住拖动来熨烫'

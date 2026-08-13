@@ -7,7 +7,7 @@ import type { ImportMode } from '../types'
  * - pattern：只做图纸，对照手动放豆；放下的珠子覆盖图纸格，擦除即露出图纸。
  * - beads：优先「从图纸生成豆子」——检测标准网格图纸（如 40×40），逐格取中心色
  *   精确生成豆子；检测不到网格时回退到逐像素缩放识别。
- * 尺寸超出当前画布时自动扩容。
+ * 画布固定 40×40：图案最长边 ≤ MAX_PIX（=画布边长），写入前自动缩放并居中，不扩容画布。
  */
 
 /** 网格线行：平均灰度比前后行显著更暗（网格线比格子深；阈值取小，靠下方均匀性校验兜底） */
@@ -264,7 +264,9 @@ export function importImage(file: File, mode: ImportMode) {
       URL.revokeObjectURL(url)
       return
     }
-    if (mode === 'beads') showStatus('未检测到网格线，按普通方式识别图片...')
+    if (mode === 'beads') {
+      showStatus('未检测到网格线，按普通方式识别图片...')
+    }
 
     const ir = img.width / img.height
     let pw: number

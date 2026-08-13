@@ -24,18 +24,25 @@ export interface ThreeBoardHandle {
   requestRebuildPattern(): void
   /** 同步立即重建珠子与图纸实例（初始渲染等不能延迟的场景） */
   rebuild(): void
+  /** 同步立即重建珠子层（熔融批量复位后必须立刻反映，rAF 延迟会残留一帧熔融连片） */
+  rebuildNow(): void
+  /** 视角适配：把画布整体居中收进视口（初始渲染 / 切回设计模式时调用） */
+  fitView(): void
   dispose(): void
 }
 
-/** 初始俯视角（视线与水平面夹角，°）与相机 fov */
-const TILT_DEG = 55
+/** 初始俯视角（视线与水平面夹角，°）与相机 fov。
+ *  90° = 完全垂直俯视；75° 接近垂直但保留明显倾斜感（用户偏好：不要太斜也不要完全垂直） */
+const TILT_DEG = 75
 const FOV = 50
-/** 缩放范围（1 = 每格 DISPLAY_CELL 显示像素） */
+/** 缩放范围（1 = 每格 DISPLAY_CELL 显示像素）。
+ *  MAX_SCALE=3：一格最大 108px（DISPLAY_CELL×3），一颗豆子直径约 100px，约 12 格横贯屏幕——
+ *  放豆/熨烫时能看清细节但不会放大到"豆子占满屏幕"；整体适配（fitView）在 0.5 左右，不受此上限影响 */
 const MIN_SCALE = 0.25
-const MAX_SCALE = 12
+const MAX_SCALE = 3
 /** 每格显示像素低于该值时隐藏网格线 */
 const MIN_GRID_LINE_PX = 10
-/** 视角旋转灵敏度（rad/px）与俯仰角可调范围（±89.5°，初始 55°）。
+/** 视角旋转灵敏度（rad/px）与俯仰角可调范围（±89.5°，初始 75°）。
  *  配合无限制的 yaw，可环绕棋盘无死角观赏：上到头顶、下到板底。
  *  正负 90° 极点有万向锁（水平拖拽无效），各留 0.5° 余量即可 */
 const ROT_SPEED = 0.006
@@ -105,6 +112,13 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   scene.add(fill)
   fill.target = new THREE.Object3D()
   scene.add(fill.target) // 补光方向固定跟随注视中心，平移画布时光照一致
+  // 底光：从板下向上照。朝下的面（豆子背面/孔内壁）只吃到 0.18 环境光会变成
+  // 没有明暗的暗色块（翻面看背面很糊）；这盏灯方向朝上、只照亮朝下的面，
+  // 顶面观感零影响，翻到板下时背面才有轮廓与细节
+  const upFill = new THREE.DirectionalLight(0xffffff, 0.35)
+  scene.add(upFill)
+  upFill.target = new THREE.Object3D()
+  scene.add(upFill.target)
 
   // 工作台地面（深色，比背景略亮以区分平面，接收珠子的投影）；范围足够大，任何缩放下都盖住视口
   const ground = new THREE.Mesh(
@@ -223,7 +237,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   let scale = 1
   let baseDist = 50
   const center = { x: 0, z: 0 }
-  // 视角（球坐标）：yaw 绕 Y 轴（0 = 正 +Z 侧看），pitch 与水平面夹角。初始固定 55° 俯视
+  // 视角（球坐标）：yaw 绕 Y 轴（0 = 正 +Z 侧看），pitch 与水平面夹角。初始 75° 近垂直俯视
   let yaw = Math.PI
   let pitch = (TILT_DEG * Math.PI) / 180
 
@@ -338,7 +352,7 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     return changed
   }
 
-  /** 相机按当前 center/scale/yaw/pitch 定位（yaw=π、pitch=55° 时与初始固定视角一致） */
+  /** 相机按当前 center/scale/yaw/pitch 定位（yaw=π、pitch=75° 时与初始固定视角一致） */
   function applyView() {
     const r = baseDist / scale
     const cp = Math.cos(pitch)
@@ -355,11 +369,15 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
     // 补光从斜对面照向注视中心，填充暗面
     fill.position.set(center.x - 70, 70, center.z - 50)
     fill.target.position.set(center.x, 0, center.z)
+    // 底光从板下照向注视中心：翻面看背面时的明暗来源
+    upFill.position.set(center.x + 55, -110, center.z + 45)
+    upFill.target.position.set(center.x, 0, center.z)
     updateSceneVisibility()
     markRender()
   }
 
-  /** 导入图纸后自动适配视角：把图纸内容包围盒完整放进视口。
+  /** 自动适配视角：把整块 40×40 画布完整放进视口（画布固定 40×40，内容已按
+   *  offC/offR 居中放在画布中间，所以对焦画布 = 对焦内容）。
    *  保持当前 yaw/pitch 不变（尊重用户已选的观察角度），只平移注视中心 + 调整缩放。
    *  用正确的透视几何求相机距离：以相机距离 r、俯角 pitch、方位 yaw 注视内容中心，
    *  内容包围盒沿观察方向的深度半跨度 maxS = hw·|sin yaw| + hh·|cos yaw|，
@@ -371,35 +389,15 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   function fitViewToBoard() {
     const { w, h } = viewportSize()
     const pad = 0.9 // 棋盘占视口最大比例
-    // 用图纸内容包围盒（豆子 + 像素参考层）计算，而不是 store.cols/rows：
-    // 网格可能被「视口角落射线」历史扩容撑大（ensureGridFitsViewport 的远处交点），
-    // 若按 cols/rows 适配，scale 会被钳到 MIN_SCALE，豆子反而太小
-    let minR = Infinity, maxR = -1, minC = Infinity, maxC = -1
-    for (let r = 0; r < store.rows; r++) {
-      const row = store.grid[r]
-      for (let c = 0; c < store.cols; c++) {
-        const cell = row[c]
-        if (cell.color || cell.pixel) {
-          if (r < minR) minR = r
-          if (r > maxR) maxR = r
-          if (c < minC) minC = c
-          if (c > maxC) maxC = c
-        }
-      }
-    }
-    let cellsW: number, cellsH: number
-    if (minR === Infinity) {
-      // 空棋盘：按整个网格适配
-      cellsW = Math.max(1, store.cols)
-      cellsH = Math.max(1, store.rows)
-      center.x = cellsW / 2
-      center.z = cellsH / 2
-    } else {
-      cellsW = maxC - minC + 1
-      cellsH = maxR - minR + 1
-      center.x = (minC + maxC + 1) / 2
-      center.z = (minR + maxR + 1) / 2
-    }
+    // 画布固定 40×40（expandGridKeep 恒为 no-op），始终把整块画布居中收进视口：
+    // 导入图案已按 offC/offR 居中放在画布中央，按整块画布适配即同时居中图案。
+    // 早期按「内容包围盒」适配，是给会被视口角落射线扩容撑大的旧网格打的补丁
+    // （网格扩容后按 cols/rows 适配会把 scale 钳到 MIN_SCALE）；网格不再扩容，
+    // 那套逻辑已过时，反而会把较小的图案放大到超出画布边缘。
+    const cellsW = Math.max(1, store.cols)
+    const cellsH = Math.max(1, store.rows)
+    center.x = cellsW / 2
+    center.z = cellsH / 2
     const hw = cellsW / 2
     const hh = cellsH / 2
     const cp = Math.cos(pitch)
@@ -743,12 +741,12 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   }
 
   let raf = 0
-  // 导入触发视角适配的版本记录：fitViewTick 变化 → 下一帧把棋盘整体收进视口
+  // 视角归中请求（导入图纸 / 点「设计」都会 +1）：fitViewTick 变化 → 下一帧把棋盘整体收进视口
   let lastFitTick = store.fitViewTick
   function animate() {
     raf = requestAnimationFrame(animate)
     let changed = false
-    // 导入图纸成功（fitViewTick++）→ 自动调整视角，让整个棋盘入镜
+    // 视角归中请求（导入图纸 / 点「设计」）→ 自动调整视角，让整个棋盘入镜
     if (store.fitViewTick !== lastFitTick) {
       lastFitTick = store.fitViewTick
       fitViewToBoard()
@@ -835,7 +833,19 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   let rebuildPending = false
   let rebuildRaf = 0
 
-  /** 珠子层内容变化（放豆/擦除/熔融跨形态边界）→ 下一帧合并重建珠子实例（不重建图纸层：
+  /** 同步重建珠子层（不重建图纸层）。用于切回设计模式这类需要“下一帧渲染时已是最新”的场景：
+   *  熔融复位走 rAF 延迟重建时，棋盘线已先恢复显示、珠子却还是熔融后的浅色连片，
+   *  会有一帧“白雾盖在棋盘上”的残留。同步重建后下一帧渲染到的就是空心珠，杜绝该残留帧 */
+  function rebuildNow() {
+    if (rebuildPending) {
+      cancelAnimationFrame(rebuildRaf)
+      rebuildPending = false
+    }
+    buildBeadInstances()
+    markRender()
+  }
+
+  /** 珠子层内容变化（放豆/擦除/导入/清空/载入/熔融跨形态边界）→ 下一帧合并重建珠子实例（不重建图纸层：
    *  放豆/擦除不会改变 pixel 层，图纸实例无需动）。
    *  同一帧内多次触发只重建一次：拖拽放豆/6×6 擦除每个 pointermove 都可能触发 gridVersion++，
    *  同步全量重建会反复扫描整表 + 新建 InstancedMesh；延迟一帧后肉眼不可见，
@@ -934,12 +944,20 @@ export function createThreeBoard(container: HTMLElement): ThreeBoardHandle {
   el.addEventListener('contextmenu', onContext)
 
   resize()
-  ensureGridFitsViewport()
-  center.x = store.cols / 2
-  center.z = store.rows / 2
-  applyView()
+  // 初始即把整块 40×40 画布居中收进视口（fitViewToBoard 内部 applyView 并设定 center/scale），
+  // 画布固定在屏幕中间，四周为工作台深色区域
+  fitViewToBoard()
   rebuild()
   animate()
 
-  return { resize, update, requestRebuild, requestRebuildPattern, rebuild, dispose }
+  return {
+    resize,
+    update,
+    requestRebuild,
+    requestRebuildPattern,
+    rebuild,
+    rebuildNow,
+    fitView: fitViewToBoard,
+    dispose,
+  }
 }
